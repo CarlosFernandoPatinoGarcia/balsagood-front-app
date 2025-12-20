@@ -1,178 +1,321 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import api from '../api/api';
 import { colors } from '../theme/colors';
 
 const IngresoPalletsScreen = () => {
-    const [form, setForm] = useState({
-        // idRecepcion: '', // Eliminado
-        // palletNumero: '', // Eliminado
-        palletCantPlantillas: '',
-        palletLargo: '',
-        palletAncho: '',
-        palletEspesor: '',
-        calificacion: 5,
+    const [formData, setFormData] = useState({
+        num_viaje: '',
+        fecha_ingreso: new Date().toISOString().split('T')[0], // Default YYYY-MM-DD
+        prov_nombre: '',
+        pallet_numero: '',
+        pallet_emplantillador: '',
+        dimensiones: {
+            largo: '',
+            ancho_plantilla: '',
+            espesor: '',
+            cantidad_plantilla: ''
+        },
+        calificaciones: [] // Lista dinámica
     });
 
-    // Estado para guardar la respuesta del servidor y mostrarla
-    const [ultimoPallet, setUltimoPallet] = useState(null);
+    const [isValid, setIsValid] = useState(false);
 
-    const handleChange = (key, value) => setForm({ ...form, [key]: value });
+    // Validar formulario cada vez que cambian los datos
+    useEffect(() => {
+        const validate = () => {
+            const { num_viaje, prov_nombre, pallet_numero, dimensiones, calificaciones } = formData;
+
+            // Campos de primer nivel obligatorios
+            if (!num_viaje || !prov_nombre || !pallet_numero) return false;
+
+            // Dimensiones obligatorias
+            if (!dimensiones.largo || !dimensiones.ancho_plantilla ||
+                !dimensiones.espesor || !dimensiones.cantidad_plantilla) return false;
+
+            // Calificaciones obligatorias (si existen, deben tener valor)
+            // Nota: El array puede estar vacío o tener items. Si tiene items, valor es obligatorio.
+            const calificacionesValidas = calificaciones.every(c => c.valor);
+            if (!calificacionesValidas) return false;
+
+            return true;
+        };
+        setIsValid(validate());
+    }, [formData]);
+
+    const handleChange = (key, value) => {
+        setFormData(prev => ({ ...prev, [key]: value }));
+    };
+
+    const handleDimensionChange = (key, value) => {
+        setFormData(prev => ({
+            ...prev,
+            dimensiones: { ...prev.dimensiones, [key]: value }
+        }));
+    };
+
+    const addCalificacion = () => {
+        setFormData(prev => ({
+            ...prev,
+            calificaciones: [...prev.calificaciones, { valor: '', motivo: '' }]
+        }));
+    };
+
+    const updateCalificacion = (index, field, value) => {
+        const newCalificaciones = [...formData.calificaciones];
+        newCalificaciones[index][field] = value;
+        setFormData(prev => ({ ...prev, calificaciones: newCalificaciones }));
+    };
+
+    const removeCalificacion = (index) => {
+        const newCalificaciones = formData.calificaciones.filter((_, i) => i !== index);
+        setFormData(prev => ({ ...prev, calificaciones: newCalificaciones }));
+    };
 
     const handleSubmit = async () => {
-        // Validaciones básicas antes de enviar
-        if (!form.palletLargo || !form.palletAncho || !form.palletEspesor) {
-            Alert.alert('Error', 'Por favor complete las dimensiones');
-            return;
-        }
+        if (!isValid) return;
 
         try {
-            // 1. Preparamos el objeto SOLO con los datos físicos (dimensiones)
-            // NO enviamos BFT, el backend lo hará.
-            const palletPayload = {
-                recepcion: { idRecepcion: 1 }, // Hardcoded temporalmente o manejado por backend
-                // palletNumero: parseInt(form.palletNumero), // Eliminado
-                palletCantPlantillas: parseInt(form.palletCantPlantillas || 0),
-                palletLargo: parseFloat(form.palletLargo),
-                // IMPORTANTE: El backend usa 'palletAnchoPlantilla' para la fórmula
-                palletAnchoPlantilla: parseFloat(form.palletAncho),
-                palletAncho: parseFloat(form.palletAncho),
-                palletEspesor: parseFloat(form.palletEspesor),
-                palletEstado: 'MADERA VERDE'
+            // Construir payload con tipos de datos correctos
+            const payload = {
+                num_viaje: parseInt(formData.num_viaje),
+                fecha_ingreso: formData.fecha_ingreso,
+                prov_nombre: formData.prov_nombre,
+                pallet_numero: parseInt(formData.pallet_numero),
+                pallet_emplantillador: formData.pallet_emplantillador || "",
+                dimensiones: {
+                    largo: parseFloat(formData.dimensiones.largo),
+                    ancho_plantilla: parseFloat(formData.dimensiones.ancho_plantilla),
+                    espesor: parseFloat(formData.dimensiones.espesor),
+                    cantidad_plantilla: parseInt(formData.dimensiones.cantidad_plantilla)
+                },
+                calificaciones: formData.calificaciones.map(c => ({
+                    valor: parseFloat(c.valor),
+                    motivo: c.motivo || ""
+                }))
             };
 
-            // 2. Enviamos al Backend
-            const response = await api.post('/pallets-verdes', palletPayload);
+            // Enviar a la ruta configurada (ejemplo: /ingreso-completo o /pallets-verdes)
+            // Usaremos /ingreso-balsa como endpoint unificado sugerido
+            const response = await api.post('/ingreso-balsa', payload);
 
-            // 3. RECIBIMOS el cálculo del Backend
-            // Spring Boot nos devuelve el objeto creado, que ya incluye los BFT calculados
-            const palletGuardado = response.data;
-            const newPalletId = palletGuardado.idPallet;
+            Alert.alert('Éxito', 'Ingreso registrado correctamente');
 
-            // 4. Guardamos la calificación (si aplica)
-            if (newPalletId) {
-                await api.post('/calificaciones-pallets', {
-                    palletVerde: { idPallet: newPalletId },
-                    calificacionValor: parseFloat(form.calificacion),
-                    calificadorUsuario: 'Supervisor Movil',
-                    calificacionFecha: new Date().toISOString()
-                });
-            }
-
-            // 5. Actualizamos la UI con los datos REALES del servidor
-            setUltimoPallet({
-                numero: palletGuardado.palletNumero, // El backend debe haberlo generado
-                bftRecibido: palletGuardado.bftVerdeRecibido,
-                bftAceptado: palletGuardado.bftVerdeAceptado
-            });
-
-            Alert.alert('Éxito', `Pallet #${palletGuardado.palletNumero || 'Registrado'} procesado correctamente.`);
-
-            // Limpiamos el formulario para el siguiente
-            setForm({
-                ...form,
-                palletCantPlantillas: '',
-                // Opcional: limpiar dimensiones si varían mucho
-            });
+            // Resetear formulario o parte de él
+            setFormData(prev => ({
+                ...prev,
+                pallet_numero: '',
+                dimensiones: { ...prev.dimensiones, cantidad_plantilla: '' },
+                calificaciones: []
+            }));
 
         } catch (error) {
             console.error(error);
-            Alert.alert('Error', 'No se pudo guardar. Verifique conexión.');
+            Alert.alert('Error', 'Hubo un problema al registrar el ingreso');
         }
     };
 
     return (
-        <ScrollView contentContainerStyle={styles.container}>
-            <Text style={styles.sectionTitle}>Datos del Pallet</Text>
+        <View style={{ flex: 1 }}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.container}>
+                <Text style={styles.headerTitle}>Ingreso de Pallets</Text>
 
-            {/* Campos de ID eliminados: ID Recepción y Número de Pallet */}
+                {/* 1. Datos de Recepción */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>1. Datos de Recepción</Text>
 
-            <View style={styles.row}>
-                <View style={styles.col}>
-                    <Text style={styles.label}>Largo (pies)</Text>
-                    <TextInput style={styles.input} keyboardType="numeric" onChangeText={(v) => handleChange('palletLargo', v)} value={form.palletLargo} />
+                    <Text style={styles.label}>Número de Viaje *</Text>
+                    <TextInput
+                        style={styles.input}
+                        keyboardType="numeric"
+                        value={formData.num_viaje}
+                        onChangeText={(text) => handleChange('num_viaje', text)}
+                    />
+
+                    <Text style={styles.label}>Fecha Ingreso (YYYY-MM-DD)</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={formData.fecha_ingreso}
+                        onChangeText={(text) => handleChange('fecha_ingreso', text)}
+                        placeholder="2024-01-01"
+                        placeholderTextColor={colors.textSecondary}
+                    />
+
+                    <Text style={styles.label}>Nombre Proveedor *</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={formData.prov_nombre}
+                        onChangeText={(text) => handleChange('prov_nombre', text)}
+                    />
                 </View>
-                <View style={styles.col}>
-                    <Text style={styles.label}>Ancho (pulg)</Text>
-                    <TextInput style={styles.input} keyboardType="numeric" onChangeText={(v) => handleChange('palletAncho', v)} value={form.palletAncho} />
-                </View>
-            </View>
 
-            <View style={styles.row}>
-                <View style={styles.col}>
-                    <Text style={styles.label}>Espesor (pulg)</Text>
-                    <TextInput style={styles.input} keyboardType="numeric" onChangeText={(v) => handleChange('palletEspesor', v)} value={form.palletEspesor} />
-                </View>
-                <View style={styles.col}>
-                    <Text style={styles.label}>Cant. Plantillas</Text>
-                    <TextInput style={styles.input} keyboardType="numeric" onChangeText={(v) => handleChange('palletCantPlantillas', v)} value={form.palletCantPlantillas} />
-                </View>
-            </View>
+                {/* 2. Datos del Pallet */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>2. Datos del Pallet</Text>
 
-            <Text style={styles.label}>Calidad (1-10)</Text>
-            <View style={styles.qualityContainer}>
-                {[1, 5, 10].map((val) => (
-                    <TouchableOpacity
-                        key={val}
-                        style={[styles.qualityBtn, form.calificacion === val && styles.qualityBtnActive]}
-                        onPress={() => handleChange('calificacion', val)}
-                    >
-                        <Text style={styles.qualityText}>{val}</Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-            <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-                <Text style={styles.submitText}>PROCESAR Y GUARDAR</Text>
-            </TouchableOpacity>
-
-            {/* Tarjeta de Confirmación de Cálculo del Backend */}
-            {ultimoPallet && (
-                <View style={styles.resultCard}>
-                    <Text style={styles.resultTitle}>Último Registro (Backend):</Text>
-                    <Text style={styles.resultText}>Pallet #{ultimoPallet.numero}</Text>
-                    <View style={styles.divider} />
                     <View style={styles.row}>
-                        <View>
-                            <Text style={styles.labelSmall}>BFT Recibido</Text>
-                            <Text style={styles.resultValue}>{ultimoPallet.bftRecibido}</Text>
+                        <View style={styles.col}>
+                            <Text style={styles.label}>Número Pallet *</Text>
+                            <TextInput
+                                style={styles.input}
+                                keyboardType="numeric"
+                                value={formData.pallet_numero}
+                                onChangeText={(text) => handleChange('pallet_numero', text)}
+                            />
                         </View>
-                        <View>
-                            <Text style={styles.labelSmall}>BFT Aceptado</Text>
-                            <Text style={styles.resultValue}>{ultimoPallet.bftAceptado}</Text>
+                        <View style={styles.col}>
+                            <Text style={styles.label}>Emplantillador</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={formData.pallet_emplantillador}
+                                onChangeText={(text) => handleChange('pallet_emplantillador', text)}
+                            />
                         </View>
                     </View>
                 </View>
-            )}
-        </ScrollView>
+
+                {/* 3. Dimensiones */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>3. Dimensiones *</Text>
+
+                    <View style={styles.row}>
+                        <View style={styles.col}>
+                            <Text style={styles.label}>Largo</Text>
+                            <TextInput
+                                style={styles.input}
+                                keyboardType="numeric"
+                                value={formData.dimensiones.largo}
+                                onChangeText={(text) => handleDimensionChange('largo', text)}
+                            />
+                        </View>
+                        <View style={styles.col}>
+                            <Text style={styles.label}>Ancho Plantilla</Text>
+                            <TextInput
+                                style={styles.input}
+                                keyboardType="numeric"
+                                value={formData.dimensiones.ancho_plantilla}
+                                onChangeText={(text) => handleDimensionChange('ancho_plantilla', text)}
+                            />
+                        </View>
+                    </View>
+
+                    <View style={styles.row}>
+                        <View style={styles.col}>
+                            <Text style={styles.label}>Espesor</Text>
+                            <TextInput
+                                style={styles.input}
+                                keyboardType="numeric"
+                                value={formData.dimensiones.espesor}
+                                onChangeText={(text) => handleDimensionChange('espesor', text)}
+                            />
+                        </View>
+                        <View style={styles.col}>
+                            <Text style={styles.label}>Cantidad</Text>
+                            <TextInput
+                                style={styles.input}
+                                keyboardType="numeric"
+                                value={formData.dimensiones.cantidad_plantilla}
+                                onChangeText={(text) => handleDimensionChange('cantidad_plantilla', text)}
+                            />
+                        </View>
+                    </View>
+                </View>
+
+                {/* 4. Calificaciones */}
+                <View style={styles.section}>
+                    <View style={styles.rowHeader}>
+                        <Text style={styles.sectionTitle}>4. Calificaciones</Text>
+                        <TouchableOpacity onPress={addCalificacion} style={styles.addButton}>
+                            <Text style={styles.addButtonText}>+ Agregar</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {formData.calificaciones.map((cal, index) => (
+                        <View key={index} style={styles.card}>
+                            <View style={styles.row}>
+                                <View style={[styles.col, { flex: 1 }]}>
+                                    <Text style={styles.label}>Valor *</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        keyboardType="numeric"
+                                        value={cal.valor.toString()}
+                                        onChangeText={(text) => updateCalificacion(index, 'valor', text)}
+                                    />
+                                </View>
+                                <TouchableOpacity onPress={() => removeCalificacion(index)} style={styles.deleteButton}>
+                                    <Text style={styles.deleteButtonText}>X</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <Text style={styles.label}>Motivo</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={cal.motivo}
+                                onChangeText={(text) => updateCalificacion(index, 'motivo', text)}
+                                placeholder="Opcional"
+                                placeholderTextColor={colors.textSecondary}
+                            />
+                        </View>
+                    ))}
+                    {formData.calificaciones.length === 0 && (
+                        <Text style={styles.emptyText}>No hay calificaciones registradas</Text>
+                    )}
+                </View>
+
+                <TouchableOpacity
+                    style={[styles.submitBtn, !isValid && styles.submitBtnDisabled]}
+                    onPress={handleSubmit}
+                    disabled={!isValid}
+                >
+                    <Text style={styles.submitText}>REGISTRAR INGRESO</Text>
+                </TouchableOpacity>
+
+                <View style={{ height: 50 }} />
+            </ScrollView>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: { padding: 20, backgroundColor: colors.background, flexGrow: 1 },
+    headerTitle: { color: colors.primary, fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
+    section: { marginBottom: 25, backgroundColor: 'rgba(255,255,255,0.05)', padding: 15, borderRadius: 10 },
     sectionTitle: { color: colors.primary, fontSize: 18, fontWeight: 'bold', marginBottom: 15 },
-    label: { color: colors.textSecondary, marginBottom: 5 },
-    labelSmall: { color: colors.textSecondary, fontSize: 12 },
-    input: { backgroundColor: colors.card, color: colors.white, borderRadius: 8, padding: 10, marginBottom: 15, borderWidth: 1, borderColor: colors.border },
-    row: { flexDirection: 'row', justifyContent: 'space-between' },
-    col: { width: '48%' },
 
-    // Estilos de Calidad
-    qualityContainer: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 20 },
-    qualityBtn: { padding: 10, borderRadius: 50, backgroundColor: colors.card, width: 50, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-    qualityBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-    qualityText: { color: colors.white, fontWeight: 'bold' },
+    label: { color: colors.textSecondary, marginBottom: 5, fontSize: 14 },
+    input: {
+        backgroundColor: colors.card,
+        color: colors.white,
+        borderRadius: 8,
+        padding: 10,
+        marginBottom: 15,
+        borderWidth: 1,
+        borderColor: colors.border,
+        fontSize: 16
+    },
 
-    // Botón Principal
-    submitBtn: { backgroundColor: colors.primary, padding: 15, borderRadius: 8, alignItems: 'center', marginBottom: 20 },
+    row: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
+    rowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
+    col: { flex: 1 },
+
+    // Calificaciones
+    card: {
+        backgroundColor: colors.background,
+        padding: 10,
+        borderRadius: 8,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: colors.border
+    },
+    addButton: { backgroundColor: colors.primary, paddingVertical: 5, paddingHorizontal: 15, borderRadius: 20 },
+    addButtonText: { color: colors.background, fontWeight: 'bold' },
+    deleteButton: { marginLeft: 10, justifyContent: 'center', padding: 5 },
+    deleteButtonText: { color: 'red', fontWeight: 'bold', fontSize: 18 },
+    emptyText: { color: colors.textSecondary, fontStyle: 'italic', textAlign: 'center' },
+
+    // Submit
+    submitBtn: { backgroundColor: colors.primary, padding: 15, borderRadius: 8, alignItems: 'center' },
+    submitBtnDisabled: { backgroundColor: colors.border, opacity: 0.5 },
     submitText: { color: colors.background, fontWeight: 'bold', fontSize: 16 },
-
-    // Tarjeta de Resultado
-    resultCard: { backgroundColor: '#1A4D36', padding: 15, borderRadius: 10, borderColor: colors.primary, borderWidth: 1, marginTop: 10 },
-    resultTitle: { color: colors.white, fontWeight: 'bold', marginBottom: 5 },
-    resultText: { color: colors.text, fontSize: 16, marginBottom: 10 },
-    resultValue: { color: colors.primary, fontSize: 22, fontWeight: 'bold' },
-    divider: { height: 1, backgroundColor: colors.border, marginVertical: 10 }
 });
 
 export default IngresoPalletsScreen;
