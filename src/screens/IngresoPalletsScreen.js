@@ -95,9 +95,7 @@ const IngresoPalletsScreen = () => {
                 }))
             };
 
-            // Enviar a la ruta configurada (ejemplo: /ingreso-completo o /pallets-verdes)
-            // Usaremos /ingreso-balsa como endpoint unificado sugerido
-            const response = await api.post('/ingreso-balsa', payload);
+            const response = await api.post('/api/ingreso/ingreso-completo', payload);
 
             Alert.alert('Éxito', 'Ingreso registrado correctamente');
 
@@ -216,6 +214,40 @@ const IngresoPalletsScreen = () => {
                                 keyboardType="numeric"
                                 value={formData.dimensiones.cantidad_plantilla}
                                 onChangeText={(text) => handleDimensionChange('cantidad_plantilla', text)}
+                            />
+                        </View>
+                    </View>
+                </View>
+
+                {/* Cálculos BFT (Visuales) */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Cálculos Estimados (BFT)</Text>
+                    <View style={styles.row}>
+                        <View style={styles.col}>
+                            <Text style={styles.label}>BFT Recibido</Text>
+                            <TextInput
+                                style={[styles.input, { backgroundColor: '#e0e0e0', color: colors.textPrimary }]}
+                                value={(
+                                    (parseFloat(formData.dimensiones.largo || 0) *
+                                        parseFloat(formData.dimensiones.ancho_plantilla || 0) *
+                                        parseFloat(formData.dimensiones.espesor || 0) *
+                                        parseInt(formData.dimensiones.cantidad_plantilla || 0)) / 12
+                                ).toFixed(2)}
+                                editable={false}
+                            />
+                        </View>
+                        <View style={styles.col}>
+                            <Text style={styles.label}>BFT Aceptado (90%)</Text>
+                            <TextInput
+                                style={[styles.input, { backgroundColor: '#e0e0e0', color: colors.textPrimary }]}
+                                value={(
+                                    ((parseFloat(formData.dimensiones.largo || 0) *
+                                        parseFloat(formData.dimensiones.ancho_plantilla || 0) *
+                                        parseFloat(formData.dimensiones.espesor || 0) *
+                                        parseInt(formData.dimensiones.cantidad_plantilla || 0)) / 12) *
+                                    0.9
+                                ).toFixed(2)}
+                                editable={false}
                             />
                         </View>
                     </View>

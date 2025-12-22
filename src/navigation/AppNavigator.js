@@ -7,6 +7,7 @@ import DashboardScreen from '../screens/DashboardScreen';
 import IngresoPalletsScreen from '../screens/IngresoPalletsScreen';
 import ProduccionScreen from '../screens/ProduccionScreen';
 import AgrupacionScreen from '../screens/AgrupacionScreen';
+import GestionSecadoScreen from '../screens/GestionSecadoScreen';
 import { colors } from '../theme/colors';
 import { StatusBar } from 'react-native';
 
@@ -28,6 +29,7 @@ const AppNavigator = () => {
                 <Stack.Screen name="IngresoPallets" component={IngresoPalletsScreen} options={{ title: 'Ingreso Pallets' }} />
                 <Stack.Screen name="Produccion" component={ProduccionScreen} options={{ title: 'Producción y Encolado' }} />
                 <Stack.Screen name="Agrupacion" component={AgrupacionScreen} options={{ title: 'Despacho' }} />
+                <Stack.Screen name="GestionSecado" component={GestionSecadoScreen} options={{ title: 'Gestión de Secado' }} />
             </Stack.Navigator>
         </NavigationContainer>
     );

@@ -20,7 +20,7 @@ const DashboardScreen = ({ navigation }) => {
             {/* Botón placeholder para gestión futura */}
             <MenuButton
                 title="Gestión de Secado"
-                onPress={() => console.log('Gestión de Secado')}
+                onPress={() => navigation.navigate('GestionSecado')}
             />
             <MenuButton
                 title="Producción y Encolado"
