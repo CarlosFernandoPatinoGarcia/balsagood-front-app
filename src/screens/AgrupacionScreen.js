@@ -23,7 +23,7 @@ const AgrupacionScreen = () => {
     const fetchBloques = async () => {
         try {
             // En un escenario real, filtraríamos por estado en el backend: /bloques?estado=LISTO
-            const res = await api.get('/bloques');
+            const res = await api.get('/api/bloques');
             // Filtramos localmente para demo: Listo o Encolado
             const filtered = res.data.filter(b => b.bestado === 'LISTO' || b.bestado === 'ENCOLADO');
             setBloques(filtered);
@@ -49,7 +49,7 @@ const AgrupacionScreen = () => {
 
         try {
             // 1. Crear el Cuerpo
-            const cuerpoRes = await api.post('/cuerpos', {
+            const cuerpoRes = await api.post('/api/cuerpos', {
                 cuerpoAnchoFinal: anchoTotal,
                 cuerpoObservacion: `Generado desde App con ${selectedIds.length} bloques`
             });
@@ -60,7 +60,7 @@ const AgrupacionScreen = () => {
             // Aquí haremos un loop simple
             const updatePromises = selectedIds.map(id => {
                 const bloqueOriginal = bloques.find(b => b.idBloque === id);
-                return api.put(`/bloques/${id}`, {
+                return api.put(`/api/bloques/${id}`, {
                     ...bloqueOriginal, // mantienes datos viejos
                     cuerpo: { idCuerpo: nuevoCuerpo.idCuerpo },
                     bEstado: 'DESPACHO' // Nuevo estado

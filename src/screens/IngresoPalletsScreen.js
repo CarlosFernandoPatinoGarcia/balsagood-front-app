@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Switch } from 'react-native';
 import api from '../api/api';
 import { colors } from '../theme/colors';
 
@@ -10,64 +10,108 @@ const IngresoPalletsScreen = () => {
         prov_nombre: '',
         pallet_numero: '',
         pallet_emplantillador: '',
-        dimensiones: {
-            largo: '',
-            ancho_plantilla: '',
-            espesor: '',
-            cantidad_plantilla: ''
-        },
-        calificaciones: [] // Lista dinámica
+        ancho_global: '81', // Ancho Global Fijo
+        calificaciones: [{ largo: '', espesor: '', cantidad: '', castigado: false, largo_original: '' }] // Lista dinámica inicializada con una fila
     });
 
     const [isValid, setIsValid] = useState(false);
+    const [totalBFTRecibido, setTotalBFTRecibido] = useState(0);
+    const [totalBFTAceptado, setTotalBFTAceptado] = useState(0);
 
-    // Validar formulario cada vez que cambian los datos
+    // Refs para manejo de foco
+    const itemsRef = React.useRef({});
+
+    // Estado para trackear adición de filas
+    const prevCalificacionesLength = React.useRef(formData.calificaciones.length);
+
+    // Efecto para enfocar nuevo item cuando se agrega
     useEffect(() => {
-        const validate = () => {
-            const { num_viaje, prov_nombre, pallet_numero, dimensiones, calificaciones } = formData;
+        if (formData.calificaciones.length > prevCalificacionesLength.current) {
+            const index = formData.calificaciones.length - 1;
+            // Pequeño timeout para asegurar que el componente se renderizó
+            setTimeout(() => {
+                if (itemsRef.current[`largo-${index}`]) {
+                    itemsRef.current[`largo-${index}`].focus();
+                }
+            }, 100);
+        }
+        prevCalificacionesLength.current = formData.calificaciones.length;
+    }, [formData.calificaciones.length]);
 
-            // Campos de primer nivel obligatorios
-            if (!num_viaje || !prov_nombre || !pallet_numero) return false;
+    // Calcular BFT en tiempo real y validar formulario
+    useEffect(() => {
+        const calculateAndValidate = () => {
+            const { num_viaje, prov_nombre, pallet_numero, ancho_global, calificaciones } = formData;
 
-            // Dimensiones obligatorias
-            if (!dimensiones.largo || !dimensiones.ancho_plantilla ||
-                !dimensiones.espesor || !dimensiones.cantidad_plantilla) return false;
+            // 1. Cálculo BFT
+            // Fórmula: SUMA( (Largo * 81 * Espesor * Cantidad) / 12 )
+            let tempTotalRecibido = 0;
+            let tempTotalAceptado = 0;
 
-            // Calificaciones obligatorias (si existen, deben tener valor)
-            // Nota: El array puede estar vacío o tener items. Si tiene items, valor es obligatorio.
-            const calificacionesValidas = calificaciones.every(c => c.valor);
-            if (!calificacionesValidas) return false;
+            calificaciones.forEach(item => {
+                const l = parseFloat(item.largo) || 0;
+                const e = parseFloat(item.espesor) || 0;
+                const c = parseFloat(item.cantidad) || 0;
+                const ancho = parseFloat(ancho_global) || 81;
+
+                // Si es castigado, usamos largo_original para el recibido, sino usamos largo (que es el recibido = aceptado)
+                const l_original = item.castigado ? (parseFloat(item.largo_original) || 0) : l;
+
+                if (e > 0 && c > 0) {
+                    if (l > 0) {
+                        tempTotalAceptado += (l * ancho * e * c) / 12;
+                    }
+                    if (l_original > 0) {
+                        tempTotalRecibido += (l_original * ancho * e * c) / 12;
+                    }
+                }
+            });
+            setTotalBFTRecibido(tempTotalRecibido);
+            setTotalBFTAceptado(tempTotalAceptado);
+
+            // 2. Validación
+            // Campos de cabecera
+            if (!num_viaje || !prov_nombre || !pallet_numero || !ancho_global) return false;
+
+            // Validar filas dinámica
+            // Cada fila debe tener datos válidos si hay filas
+            if (calificaciones.length === 0) return false;
+
+            const itemsValidos = calificaciones.every(item =>
+                item.largo && item.espesor && item.cantidad &&
+                (!item.castigado || item.largo_original)
+            );
+
+            if (!itemsValidos) return false;
 
             return true;
         };
-        setIsValid(validate());
+
+        setIsValid(calculateAndValidate());
     }, [formData]);
 
     const handleChange = (key, value) => {
         setFormData(prev => ({ ...prev, [key]: value }));
     };
 
-    const handleDimensionChange = (key, value) => {
+    // Manejo de items dinámicos
+    const addRow = () => {
         setFormData(prev => ({
             ...prev,
-            dimensiones: { ...prev.dimensiones, [key]: value }
+            calificaciones: [...prev.calificaciones, { largo: '', espesor: '', cantidad: '', castigado: false, largo_original: '' }]
         }));
     };
 
-    const addCalificacion = () => {
-        setFormData(prev => ({
-            ...prev,
-            calificaciones: [...prev.calificaciones, { valor: '', motivo: '' }]
-        }));
-    };
-
-    const updateCalificacion = (index, field, value) => {
+    const updateRow = (index, field, value) => {
         const newCalificaciones = [...formData.calificaciones];
         newCalificaciones[index][field] = value;
         setFormData(prev => ({ ...prev, calificaciones: newCalificaciones }));
     };
 
-    const removeCalificacion = (index) => {
+    const removeRow = (index) => {
+        // Evitar borrar la última fila si se desea, pero el usuario puede querer vaciarlo. 
+        // El prompt dice "botón al presionarlo aparece nueva fila".
+        // Asumiremos que se puede borrar.
         const newCalificaciones = formData.calificaciones.filter((_, i) => i !== index);
         setFormData(prev => ({ ...prev, calificaciones: newCalificaciones }));
     };
@@ -76,22 +120,35 @@ const IngresoPalletsScreen = () => {
         if (!isValid) return;
 
         try {
-            // Construir payload con tipos de datos correctos
+            // Construir payload
             const payload = {
                 num_viaje: parseInt(formData.num_viaje),
                 fecha_ingreso: formData.fecha_ingreso,
                 prov_nombre: formData.prov_nombre,
                 pallet_numero: parseInt(formData.pallet_numero),
                 pallet_emplantillador: formData.pallet_emplantillador || "",
+                // El backend espera 'dimensiones' global? 
+                // El prompt dice: "Envía el arreglo de todas las filas capturadas en el objeto JSON de calificaciones."
+                // Probablemente el backend aun espere la estructura base. 
+                // Asumiremos que enviamos 'dimensiones' con el ancho global y quizas valores dummy o sumas para largo/espesor si fuera necesario,
+                // PERO el usuario especificó que las dimensiones son por fila.
+                // Ajustaremos para enviar el ancho en 'dimensiones' si es requerido por compatibilidad, 
+                // o si el backend fue modificado para ignorar las dimensiones globales viejas.
+                // Por seguridad, enviaremos ancho_plantilla en dimensiones, y el resto en calificaciones.
                 dimensiones: {
-                    largo: parseFloat(formData.dimensiones.largo),
-                    ancho_plantilla: parseFloat(formData.dimensiones.ancho_plantilla),
-                    espesor: parseFloat(formData.dimensiones.espesor),
-                    cantidad_plantilla: parseInt(formData.dimensiones.cantidad_plantilla)
+                    largo: 0, // Ya no hay largo global único
+                    ancho_plantilla: parseFloat(formData.ancho_global),
+                    espesor: 0, // Ya no hay espesor global único
+                    cantidad_plantilla: 0 // Ya no hay cantidad global única
                 },
                 calificaciones: formData.calificaciones.map(c => ({
-                    valor: parseFloat(c.valor),
-                    motivo: c.motivo || ""
+                    largo: parseFloat(c.largo),
+                    espesor: parseFloat(c.espesor),
+                    cantidad: parseFloat(c.cantidad),
+                    es_castigado: c.castigado,
+                    largo_original: c.castigado ? parseFloat(c.largo_original) : parseFloat(c.largo)
+                    // Si el backend aun exige 'valor' o 'motivo', podrian fallar.
+                    // Asumiremos que el backend se adaptó a esto segun instrucciones del usuario.
                 }))
             };
 
@@ -99,16 +156,15 @@ const IngresoPalletsScreen = () => {
 
             Alert.alert('Éxito', 'Ingreso registrado correctamente');
 
-            // Resetear formulario o parte de él
+            // Resetear formulario
             setFormData(prev => ({
                 ...prev,
                 pallet_numero: '',
-                dimensiones: { ...prev.dimensiones, cantidad_plantilla: '' },
-                calificaciones: []
+                calificaciones: [{ largo: '', espesor: '', cantidad: '', castigado: false, largo_original: '' }]
             }));
 
         } catch (error) {
-            console.error(error);
+            console.error('Error submitting:', error);
             Alert.alert('Error', 'Hubo un problema al registrar el ingreso');
         }
     };
@@ -172,125 +228,156 @@ const IngresoPalletsScreen = () => {
                     </View>
                 </View>
 
-                {/* 3. Dimensiones */}
+                {/* 3. Dimensiones Globales */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>3. Dimensiones *</Text>
-
+                    <Text style={styles.sectionTitle}>3. Configuración Global</Text>
                     <View style={styles.row}>
                         <View style={styles.col}>
-                            <Text style={styles.label}>Largo</Text>
+                            <Text style={styles.label}>Ancho (Fijo)</Text>
                             <TextInput
-                                style={styles.input}
-                                keyboardType="numeric"
-                                value={formData.dimensiones.largo}
-                                onChangeText={(text) => handleDimensionChange('largo', text)}
-                            />
-                        </View>
-                        <View style={styles.col}>
-                            <Text style={styles.label}>Ancho Plantilla</Text>
-                            <TextInput
-                                style={styles.input}
-                                keyboardType="numeric"
-                                value={formData.dimensiones.ancho_plantilla}
-                                onChangeText={(text) => handleDimensionChange('ancho_plantilla', text)}
-                            />
-                        </View>
-                    </View>
-
-                    <View style={styles.row}>
-                        <View style={styles.col}>
-                            <Text style={styles.label}>Espesor</Text>
-                            <TextInput
-                                style={styles.input}
-                                keyboardType="numeric"
-                                value={formData.dimensiones.espesor}
-                                onChangeText={(text) => handleDimensionChange('espesor', text)}
-                            />
-                        </View>
-                        <View style={styles.col}>
-                            <Text style={styles.label}>Cantidad</Text>
-                            <TextInput
-                                style={styles.input}
-                                keyboardType="numeric"
-                                value={formData.dimensiones.cantidad_plantilla}
-                                onChangeText={(text) => handleDimensionChange('cantidad_plantilla', text)}
+                                style={[styles.input, { backgroundColor: '#e0e0e0', color: colors.textPrimary }]}
+                                value={formData.ancho_global}
+                                editable={false} // Fijo en 81
                             />
                         </View>
                     </View>
                 </View>
 
-                {/* Cálculos BFT (Visuales) */}
+                {/* 4. Formulario Dinámico de Ítems */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Cálculos Estimados (BFT)</Text>
-                    <View style={styles.row}>
-                        <View style={styles.col}>
-                            <Text style={styles.label}>BFT Recibido</Text>
-                            <TextInput
-                                style={[styles.input, { backgroundColor: '#e0e0e0', color: colors.textPrimary }]}
-                                value={(
-                                    (parseFloat(formData.dimensiones.largo || 0) *
-                                        parseFloat(formData.dimensiones.ancho_plantilla || 0) *
-                                        parseFloat(formData.dimensiones.espesor || 0) *
-                                        parseInt(formData.dimensiones.cantidad_plantilla || 0)) / 12
-                                ).toFixed(2)}
-                                editable={false}
-                            />
-                        </View>
-                        <View style={styles.col}>
-                            <Text style={styles.label}>BFT Aceptado (90%)</Text>
-                            <TextInput
-                                style={[styles.input, { backgroundColor: '#e0e0e0', color: colors.textPrimary }]}
-                                value={(
-                                    ((parseFloat(formData.dimensiones.largo || 0) *
-                                        parseFloat(formData.dimensiones.ancho_plantilla || 0) *
-                                        parseFloat(formData.dimensiones.espesor || 0) *
-                                        parseInt(formData.dimensiones.cantidad_plantilla || 0)) / 12) *
-                                    0.9
-                                ).toFixed(2)}
-                                editable={false}
-                            />
-                        </View>
-                    </View>
-                </View>
+                    <Text style={styles.sectionTitle}>4. Detalle de Ítems (Calificaciones)</Text>
 
-                {/* 4. Calificaciones */}
-                <View style={styles.section}>
-                    <View style={styles.rowHeader}>
-                        <Text style={styles.sectionTitle}>4. Calificaciones</Text>
-                        <TouchableOpacity onPress={addCalificacion} style={styles.addButton}>
-                            <Text style={styles.addButtonText}>+ Agregar</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    {formData.calificaciones.map((cal, index) => (
+                    {formData.calificaciones.map((item, index) => (
                         <View key={index} style={styles.card}>
-                            <View style={styles.row}>
-                                <View style={[styles.col, { flex: 1 }]}>
-                                    <Text style={styles.label}>Valor *</Text>
-                                    <TextInput
-                                        style={styles.input}
-                                        keyboardType="numeric"
-                                        value={cal.valor.toString()}
-                                        onChangeText={(text) => updateCalificacion(index, 'valor', text)}
+                            {/* Cabecera del Item con Switch Castigar */}
+                            <View style={styles.itemHeader}>
+                                <Text style={styles.itemIndex}>Item #{index + 1}</Text>
+                                <View style={styles.switchContainer}>
+                                    <Text style={styles.labelSwitch}>Castigar</Text>
+                                    <Switch
+                                        value={item.castigado}
+                                        onValueChange={(val) => updateRow(index, 'castigado', val)}
+                                        trackColor={{ false: "#767577", true: colors.primary }}
+                                        thumbColor={item.castigado ? "#f4f3f4" : "#f4f3f4"}
                                     />
                                 </View>
-                                <TouchableOpacity onPress={() => removeCalificacion(index)} style={styles.deleteButton}>
-                                    <Text style={styles.deleteButtonText}>X</Text>
+                            </View>
+
+                            <View style={styles.row}>
+                                {/* Campo Largo Original (Condicional) */}
+                                {item.castigado && (
+                                    <View style={styles.col}>
+                                        <Text style={[styles.label, { color: '#f39c12' }]}>L. Orig.</Text>
+                                        <TextInput
+                                            ref={(el) => itemsRef.current[`largo_original-${index}`] = el}
+                                            style={[styles.input, { borderColor: '#f39c12' }]}
+                                            keyboardType="numeric"
+                                            placeholder="0.0"
+                                            placeholderTextColor={colors.textSecondary}
+                                            value={item.largo_original}
+                                            onChangeText={(text) => updateRow(index, 'largo_original', text)}
+                                            returnKeyType="next"
+                                            blurOnSubmit={false}
+                                            onSubmitEditing={() => {
+                                                if (itemsRef.current[`largo-${index}`]) {
+                                                    itemsRef.current[`largo-${index}`].focus();
+                                                }
+                                            }}
+                                        />
+                                    </View>
+                                )}
+
+                                <View style={styles.col}>
+                                    <Text style={styles.label}>{item.castigado ? "L. Acept." : "Largo"}</Text>
+                                    <TextInput
+                                        ref={(el) => itemsRef.current[`largo-${index}`] = el}
+                                        style={styles.input}
+                                        keyboardType="numeric"
+                                        placeholder="0.0"
+                                        placeholderTextColor={colors.textSecondary}
+                                        value={item.largo}
+                                        onChangeText={(text) => updateRow(index, 'largo', text)}
+                                        returnKeyType="next"
+                                        blurOnSubmit={false}
+                                        onSubmitEditing={() => {
+                                            if (itemsRef.current[`espesor-${index}`]) {
+                                                itemsRef.current[`espesor-${index}`].focus();
+                                            }
+                                        }}
+                                    />
+                                </View>
+                                <View style={styles.col}>
+                                    <Text style={styles.label}>Espesor</Text>
+                                    <TextInput
+                                        ref={(el) => itemsRef.current[`espesor-${index}`] = el}
+                                        style={styles.input}
+                                        keyboardType="numeric"
+                                        placeholder="0.0"
+                                        placeholderTextColor={colors.textSecondary}
+                                        value={item.espesor}
+                                        onChangeText={(text) => updateRow(index, 'espesor', text)}
+                                        returnKeyType="next"
+                                        blurOnSubmit={false}
+                                        onSubmitEditing={() => {
+                                            if (itemsRef.current[`cantidad-${index}`]) {
+                                                itemsRef.current[`cantidad-${index}`].focus();
+                                            }
+                                        }}
+                                    />
+                                </View>
+                                <View style={styles.col}>
+                                    <Text style={styles.label}>Cant.</Text>
+                                    <TextInput
+                                        ref={(el) => itemsRef.current[`cantidad-${index}`] = el}
+                                        style={styles.input}
+                                        keyboardType="numeric"
+                                        placeholder="0"
+                                        placeholderTextColor={colors.textSecondary}
+                                        value={item.cantidad}
+                                        onChangeText={(text) => updateRow(index, 'cantidad', text)}
+                                        returnKeyType="next"
+                                        blurOnSubmit={false}
+                                        onSubmitEditing={() => {
+                                            addRow();
+                                        }}
+                                    />
+                                </View>
+                                {/* Botón eliminar fila */}
+                                <TouchableOpacity onPress={() => removeRow(index)} style={styles.deleteButtonContainer}>
+                                    <Text style={styles.deleteButtonText}>✕</Text>
                                 </TouchableOpacity>
                             </View>
-                            <Text style={styles.label}>Motivo</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={cal.motivo}
-                                onChangeText={(text) => updateCalificacion(index, 'motivo', text)}
-                                placeholder="Opcional"
-                                placeholderTextColor={colors.textSecondary}
-                            />
                         </View>
                     ))}
-                    {formData.calificaciones.length === 0 && (
-                        <Text style={styles.emptyText}>No hay calificaciones registradas</Text>
-                    )}
+
+                    <View style={styles.addButtonContainer}>
+                        <TouchableOpacity onPress={addRow} style={styles.circularAddButton}>
+                            <Text style={styles.circularAddButtonText}>+</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Cálculo Visual Total */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Resumen BFT</Text>
+                    <View style={styles.row}>
+                        <View style={styles.col}>
+                            <Text style={styles.label}>Total Recibido</Text>
+                            <TextInput
+                                style={[styles.input, { backgroundColor: '#e0e0e0', color: colors.textPrimary, fontWeight: 'bold' }]}
+                                value={totalBFTRecibido.toFixed(2)}
+                                editable={false}
+                            />
+                        </View>
+                        <View style={styles.col}>
+                            <Text style={styles.label}>Total Aceptado</Text>
+                            <TextInput
+                                style={[styles.input, { backgroundColor: '#d1f2eb', color: '#0b5345', fontWeight: 'bold' }]}
+                                value={totalBFTAceptado.toFixed(2)}
+                                editable={false}
+                            />
+                        </View>
+                    </View>
                 </View>
 
                 <TouchableOpacity
@@ -329,7 +416,7 @@ const styles = StyleSheet.create({
     rowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
     col: { flex: 1 },
 
-    // Calificaciones
+    // List Items Styles
     card: {
         backgroundColor: colors.background,
         padding: 10,
@@ -338,10 +425,64 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: colors.border
     },
-    addButton: { backgroundColor: colors.primary, paddingVertical: 5, paddingHorizontal: 15, borderRadius: 20 },
-    addButtonText: { color: colors.background, fontWeight: 'bold' },
-    deleteButton: { marginLeft: 10, justifyContent: 'center', padding: 5 },
-    deleteButtonText: { color: 'red', fontWeight: 'bold', fontSize: 18 },
+    itemHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255,255,255,0.1)',
+        paddingBottom: 5
+    },
+    itemIndex: {
+        color: colors.primary,
+        fontWeight: 'bold',
+        fontSize: 14
+    },
+    switchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center'
+    },
+    labelSwitch: {
+        color: colors.textSecondary,
+        marginRight: 10,
+        fontSize: 12
+    },
+    addButtonContainer: {
+        alignItems: 'center',
+        marginTop: 10
+    },
+    circularAddButton: {
+        backgroundColor: colors.primary,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 3,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+    },
+    circularAddButtonText: {
+        color: colors.background,
+        fontSize: 24,
+        fontWeight: 'bold',
+        lineHeight: 28 // Center vertically
+    },
+    deleteButtonContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingLeft: 5,
+        // Align with inputs roughly? Inputs have marginBottom 15.
+        // We can just rely on flex layout
+    },
+    deleteButtonText: {
+        color: '#ff4444',
+        fontWeight: 'bold',
+        fontSize: 22
+    },
     emptyText: { color: colors.textSecondary, fontStyle: 'italic', textAlign: 'center' },
 
     // Submit

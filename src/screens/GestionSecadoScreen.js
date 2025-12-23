@@ -19,7 +19,7 @@ const CameraSelectorModal = ({ visible, onClose, cameras, onSelect }) => {
                         }}
                         renderItem={({ item }) => (
                             <TouchableOpacity style={styles.modalItem} onPress={() => onSelect(item)}>
-                                <Text style={styles.modalItemText}>{item.descripcion} (Cap: {item.capacidad})</Text>
+                                <Text style={styles.modalItemText}>{item.camaraDescripcion} (Cap: {item.camaraCapacidad})</Text>
                             </TouchableOpacity>
                         )}
                     />
@@ -99,10 +99,9 @@ const GestionSecadoScreen = () => {
 
     const fetchData = async () => {
         try {
-            // 1. Pallets Disponibles (Updated Endpoint per User Request Step 147)
-            // Endpoint: /api/produccion-pallets/disponibles
-            // Expecting: [{ idPallet, numViaje, palletNumero, codigo }]
-            const resPallets = await api.get('/api/produccion-pallets/disponibles');
+            // 1. Pallets Disponibles (Madera Verde)
+            // Endpoint updated to /api/secado/disponibles as per user request
+            const resPallets = await api.get('/api/secado/disponibles');
             setPalletsDisponibles(resPallets.data || []);
 
             // 2. Camaras Disponibles
@@ -128,9 +127,9 @@ const GestionSecadoScreen = () => {
     };
 
     const calculateSelectedBFT = () => {
-        // Adjust ID matching: p.id_pallet or p.id
-        const selected = palletsDisponibles.filter(p => selectedPallets.includes(p.id_pallet || p.id));
-        return selected.reduce((sum, p) => sum + (parseFloat(p.bft_verde_aceptado) || 0), 0).toFixed(2);
+        // Ajustar ID matching: p.idPallet (DTO) en lugar de p.id_pallet
+        const selected = palletsDisponibles.filter(p => selectedPallets.includes(p.idPallet));
+        return selected.reduce((sum, p) => sum + (parseFloat(p.bftVerdeAceptado) || 0), 0).toFixed(2);
     };
 
     // Validation Logic
@@ -144,20 +143,22 @@ const GestionSecadoScreen = () => {
         if (!isValid) return;
 
         const payload = {
-            idCamara: formData.idCamara,
-            loteFechaInicio: formData.loteFechaInicio, // ISO String
-            loteFechaFin: formData.loteFechaFin,     // ISO String
-            idPallets: selectedPallets,
+            idCamara: parseInt(formData.idCamara),
+            loteFechaInicio: formData.loteFechaInicio,
+            loteFechaFin: formData.loteFechaFin,
+            idPallets: selectedPallets.map(id => parseInt(id)),
             loteObservaciones: formData.loteObservaciones
-
         };
-        console.log("payload creado:" + payload);
+
+        console.log("SENDING PAYLOAD:", JSON.stringify(payload, null, 2));
+
         try {
             const response = await api.post('/api/secado/crear', payload);
+            console.log("RESPONSE SUCCESS:", response.data);
+
             const estado = response.data?.estado || 'PROGRAMADO';
             Alert.alert('Éxito', `Lote Creado. Estado: ${estado}`);
 
-            // Reset
             setFormData({
                 idCamara: null,
                 camaraDescripcion: '',
@@ -165,13 +166,18 @@ const GestionSecadoScreen = () => {
                 loteFechaFin: '',
                 loteObservaciones: ''
             });
-            console.log("datos del formulario cargados");
+            console.log("Datos del formulario reseteados");
             setSelectedPallets([]);
             fetchData();
             setActiveTab('proceso');
         } catch (error) {
-            console.error(error);
-            Alert.alert('Error', 'No se pudo crear el lote');
+            console.log("ERROR CREATE LOTE:", error);
+            if (error.response) {
+                console.log("SERVER ERROR DATA:", JSON.stringify(error.response.data, null, 2));
+                Alert.alert('Error del Servidor', `Status: ${error.response.status}\nMsg: ${JSON.stringify(error.response.data)}`);
+            } else {
+                Alert.alert('Error', error.message || 'No se pudo crear el lote');
+            }
         }
     };
 
@@ -190,7 +196,7 @@ const GestionSecadoScreen = () => {
                 {
                     text: 'Confirmar', onPress: async () => {
                         try {
-                            await api.patch(`/api/secado/finalizar/${lote.id_lote}`);
+                            await api.patch(`/api/secado/finalizar/${lote.idLote}`);
                             Alert.alert('Éxito', 'Lote enviado a Stock Seco');
                             fetchData();
                         } catch (error) {
@@ -255,7 +261,7 @@ const GestionSecadoScreen = () => {
                 // Robust ID check to fix "unique key" error
                 // Production Endpoint: idPallet
                 // Secado Endpoint: id_pallet
-                const id = p.idPallet || p.id_pallet || p.id;
+                const id = p.idPallet || p.id;
                 const uniqueKey = id ? id.toString() : `fallback-${index}`;
 
                 return (
@@ -270,13 +276,15 @@ const GestionSecadoScreen = () => {
                            - Else show 'Pallet #' + pallet_numero/palletNumero 
                          */}
                         <Text style={styles.palletText}>
-                            {p.codigo ? `Código: ${p.codigo}` : `Pallet #${p.pallet_numero || p.palletNumero || '?'}`}
-                            {p.prov_nombre ? ` - ${p.prov_nombre}` : ''}
+                            {/* DTO Mappings: codigo, palletNumero, recepcion.proveedor.provNombre */}
+                            {p.codigo ? `Código: ${p.codigo}` : `Pallet #${p.palletNumero || '?'}`}
+                            {p.recepcion?.proveedor?.provNombre ? ` - ${p.recepcion.proveedor.provNombre}` : ''}
                         </Text>
 
                         <Text style={styles.palletSub}>
-                            Viaje: {p.num_viaje || p.numViaje || '-'}
-                            {p.bft_verde_aceptado ? ` • BFT: ${p.bft_verde_aceptado}` : ''}
+                            {/* Accedemos al numViaje dentro de recepcion */}
+                            Viaje: {p.recepcion?.numViaje || '-'}
+                            {p.bftVerdeAceptado ? ` • BFT: ${p.bftVerdeAceptado}` : ''}
                         </Text>
                     </TouchableOpacity>
                 );
@@ -307,8 +315,9 @@ const GestionSecadoScreen = () => {
                 onClose={() => setShowCameraModal(false)}
                 cameras={camaras}
                 onSelect={(cam) => {
-                    const id = cam.id_camara || cam.idCamara || cam.id;
-                    setFormData({ ...formData, idCamara: id, camaraDescripcion: cam.descripcion || `Cámara ${id}` });
+                    // DTO Mappings: idCamara, camaraDescripcion
+                    const id = cam.idCamara || cam.id;
+                    setFormData({ ...formData, idCamara: id, camaraDescripcion: cam.camaraDescripcion || `Cámara ${id}` });
                     setShowCameraModal(false);
                 }}
             />
@@ -342,29 +351,33 @@ const GestionSecadoScreen = () => {
         <ScrollView style={styles.tabContent}>
             {dataLotes.length === 0 && <Text style={styles.emptyText}>No hay lotes en esta categoría.</Text>}
             {dataLotes.map(lote => {
+                // Estado esperado: LISTO PARA BFT
                 const isReady = lote.estado === 'LISTO PARA BFT';
                 return (
-                    <View key={lote.id_lote} style={styles.loteCard}>
+                    // DTO Mapping: idLote
+                    <View key={lote.idLote} style={styles.loteCard}>
                         <View style={styles.cardHeader}>
-                            <Text style={styles.cardTitle}>Lote #{lote.id_lote}</Text>
+                            <Text style={styles.cardTitle}>Lote #{lote.idLote}</Text>
                             <View style={[
                                 styles.badge,
                                 isHistory ? styles.badgeHistory : (isReady ? styles.badgeReady : styles.badgeProcess)
                             ]}>
                                 <Text style={styles.badgeText}>
-                                    {isHistory ? 'HISTORIAL' : (isReady ? 'LISTO PARA BFT' : 'SECANDO')}
+                                    {isHistory ? 'HISTORIAL' : (isReady ? 'LISTO PARA BFT' : (lote.estado || 'SECANDO'))}
                                 </Text>
                             </View>
                         </View>
 
-                        <Text style={styles.cardSub}>Cámara {lote.id_camara} • {lote.especie || 'Balsa'}</Text>
+                        {/* DTO Mapping: camara.idCamara */}
+                        <Text style={styles.cardSub}>Cámara {lote.camara?.idCamara || '?'} • {lote.especie || 'Balsa'}</Text>
 
                         <View style={styles.cardBody}>
-                            <Text style={styles.cardInfo}>Inicio: {lote.fecha_inicio ? lote.fecha_inicio.split('T')[0] : '-'}</Text>
-                            <Text style={styles.cardInfo}>Fin Est: {lote.fecha_fin ? lote.fecha_fin.split('T')[0] : '-'}</Text>
+                            {/* DTO Mappings: loteFechaInicio, loteFechaFin, bftTotalLote */}
+                            <Text style={styles.cardInfo}>Inicio: {lote.loteFechaInicio ? lote.loteFechaInicio.split('T')[0] : '-'}</Text>
+                            <Text style={styles.cardInfo}>Fin Est: {lote.loteFechaFin ? lote.loteFechaFin.split('T')[0] : '-'}</Text>
                             {isHistory && (
                                 <Text style={[styles.cardInfo, { marginTop: 5, color: colors.primary, fontWeight: 'bold' }]}>
-                                    BFT Total: {lote.bft_total_lote}
+                                    BFT Total: {lote.bftTotalLote}
                                 </Text>
                             )}
                         </View>
@@ -427,6 +440,19 @@ const styles = StyleSheet.create({
     col: { flex: 1 },
     label: { color: colors.textSecondary, marginBottom: 8 },
     input: { backgroundColor: 'rgba(255,255,255,0.1)', color: colors.white, padding: 12, borderRadius: 8 },
+
+    // Summary Styles (Requested fix)
+    summaryContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+        paddingHorizontal: 5
+    },
+    summaryText: {
+        color: colors.white,
+        fontWeight: 'bold',
+        fontSize: 16
+    },
 
     // Selectors
     selector: { backgroundColor: 'rgba(255,255,255,0.1)', padding: 12, borderRadius: 8 },

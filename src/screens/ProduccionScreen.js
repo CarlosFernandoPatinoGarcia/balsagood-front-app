@@ -25,7 +25,7 @@ const ProduccionScreen = () => {
                 bBftFinal: 0, // Calculable si es necesario
                 estado: 'PRESENTADO'
             };
-            await api.post('/bloques', payload);
+            await api.post('/api/bloques', payload);
             Alert.alert('Éxito', 'Bloque registrado como PRESENTADO');
             setNewBlock({ largo: '', ancho: '', alto: '', pesoSin: '' });
         } catch (e) {
@@ -36,7 +36,7 @@ const ProduccionScreen = () => {
     const handleUpdateEncolado = async () => {
         try {
             // 1. Obtener el bloque actual para validar peso
-            const { data: bloque } = await api.get(`/bloques/${encolado.idBloque}`);
+            const { data: bloque } = await api.get(`/api/bloques/${encolado.idBloque}`);
             const pesoSin = parseFloat(bloque.bpesoSinCola);
             const pesoCon = parseFloat(encolado.pesoCon);
 
@@ -48,7 +48,7 @@ const ProduccionScreen = () => {
             }
 
             // 2. Actualizar estado y peso
-            await api.put(`/bloques/${encolado.idBloque}/encolado`, {
+            await api.put(`/api/bloques/${encolado.idBloque}/encolado`, {
                 bPesoConCola: pesoCon
             });
 
