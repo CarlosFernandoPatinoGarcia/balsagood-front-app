@@ -79,11 +79,20 @@ const GestionSecadoScreen = () => {
     const [camaras, setCamaras] = useState([]);
     const [lotes, setLotes] = useState([]);
 
-    // Form Data
+    // Función helper para obtener fecha local YYYY-MM-DD
+    const getLocalDate = () => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     const [formData, setFormData] = useState({
         idCamara: null,
-        camaraDescripcion: '', // Display only
-        loteFechaInicio: new Date().toISOString().split('T')[0] + 'T08:00:00',
+        camaraDescripcion: '',
+        // Usar fecha local
+        loteFechaInicio: getLocalDate() + 'T08:00:00',
         loteFechaFin: '',
         loteObservaciones: ''
     });
@@ -162,7 +171,8 @@ const GestionSecadoScreen = () => {
             setFormData({
                 idCamara: null,
                 camaraDescripcion: '',
-                loteFechaInicio: new Date().toISOString().split('T')[0] + 'T08:00:00',
+                // fecha local
+                loteFechaInicio: getLocalDate() + 'T08:00:00',
                 loteFechaFin: '',
                 loteObservaciones: ''
             });
@@ -377,6 +387,8 @@ const GestionSecadoScreen = () => {
                             <Text style={styles.cardInfo}>Fin Est: {lote.loteFechaFin ? lote.loteFechaFin.split('T')[0] : '-'}</Text>
                             {isHistory && (
                                 <Text style={[styles.cardInfo, { marginTop: 5, color: colors.primary, fontWeight: 'bold' }]}>
+
+
                                     BFT Total: {lote.bftTotalLote}
                                 </Text>
                             )}

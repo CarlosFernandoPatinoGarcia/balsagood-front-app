@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Switch } from 'react-native';
+import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Switch, Modal, FlatList } from 'react-native';
 import api from '../api/api';
 import { colors } from '../theme/colors';
 
@@ -8,11 +8,15 @@ const IngresoPalletsScreen = () => {
         num_viaje: '',
         fecha_ingreso: new Date().toISOString().split('T')[0], // Default YYYY-MM-DD
         prov_nombre: '',
+        id_proveedor: null, // Nuevo campo ID
         pallet_numero: '',
         pallet_emplantillador: '',
         ancho_global: '81', // Ancho Global Fijo
         calificaciones: [{ largo: '', espesor: '', cantidad: '', castigado: false, largo_original: '' }] // Lista dinámica inicializada con una fila
     });
+
+    const [proveedores, setProveedores] = useState([]);
+    const [modalVisible, setModalVisible] = useState(false);
 
     const [isValid, setIsValid] = useState(false);
     const [totalBFTRecibido, setTotalBFTRecibido] = useState(0);
@@ -23,6 +27,20 @@ const IngresoPalletsScreen = () => {
 
     // Estado para trackear adición de filas
     const prevCalificacionesLength = React.useRef(formData.calificaciones.length);
+
+    // Cargar proveedores al montar
+    useEffect(() => {
+        const fetchProveedores = async () => {
+            try {
+                const response = await api.get('/api/proveedores');
+                setProveedores(response.data);
+            } catch (error) {
+                console.error('Error fetching proveedores:', error);
+                Alert.alert('Error', 'No se pudieron cargar los proveedores');
+            }
+        };
+        fetchProveedores();
+    }, []);
 
     // Efecto para enfocar nuevo item cuando se agrega
     useEffect(() => {
@@ -125,6 +143,7 @@ const IngresoPalletsScreen = () => {
                 num_viaje: parseInt(formData.num_viaje),
                 fecha_ingreso: formData.fecha_ingreso,
                 prov_nombre: formData.prov_nombre,
+                id_proveedor: formData.id_proveedor, // Enviar ID si existe
                 pallet_numero: parseInt(formData.pallet_numero),
                 pallet_emplantillador: formData.pallet_emplantillador || "",
                 // El backend espera 'dimensiones' global? 
@@ -201,11 +220,55 @@ const IngresoPalletsScreen = () => {
                     />
 
                     <Text style={styles.label}>Nombre Proveedor *</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={formData.prov_nombre}
-                        onChangeText={(text) => handleChange('prov_nombre', text)}
-                    />
+                    <TouchableOpacity
+                        style={[styles.input, { justifyContent: 'center' }]}
+                        onPress={() => setModalVisible(true)}
+                    >
+                        <Text style={{ color: formData.prov_nombre ? colors.white : colors.textSecondary }}>
+                            {formData.prov_nombre || "Seleccione Proveedor"}
+                        </Text>
+                    </TouchableOpacity>
+
+                    {/* Modal de Selección de Proveedor */}
+                    <Modal
+                        animationType="slide"
+                        transparent={true}
+                        visible={modalVisible}
+                        onRequestClose={() => setModalVisible(false)}
+                    >
+                        <View style={styles.modalOverlay}>
+                            <View style={styles.modalContent}>
+                                <Text style={styles.modalTitle}>Seleccionar Proveedor</Text>
+                                <FlatList
+                                    data={proveedores}
+                                    keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
+                                    renderItem={({ item }) => (
+                                        <TouchableOpacity
+                                            style={styles.modalItem}
+                                            onPress={() => {
+                                                const name = item.prov_nombre || item.provNombre || item.nombre || "Sin Nombre";
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    prov_nombre: name,
+                                                    id_proveedor: item.id
+                                                }));
+                                                setModalVisible(false);
+                                            }}
+                                        >
+                                            <Text style={styles.modalItemText}>{item.prov_nombre || item.provNombre || item.nombre || "Sin Nombre"}</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    ListEmptyComponent={<Text style={styles.emptyText}>No hay proveedores disponibles</Text>}
+                                />
+                                <TouchableOpacity
+                                    style={styles.closeButton}
+                                    onPress={() => setModalVisible(false)}
+                                >
+                                    <Text style={styles.closeButtonText}>Cancelar</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </Modal>
                 </View>
 
                 {/* 2. Datos del Pallet */}
@@ -400,6 +463,49 @@ const IngresoPalletsScreen = () => {
 };
 
 const styles = StyleSheet.create({
+    // ... styles existing ...
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        padding: 20
+    },
+    modalContent: {
+        backgroundColor: colors.background,
+        borderRadius: 10,
+        padding: 20,
+        maxHeight: '80%',
+        borderWidth: 1,
+        borderColor: colors.border
+    },
+    modalTitle: {
+        color: colors.primary,
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginBottom: 15,
+        textAlign: 'center'
+    },
+    modalItem: {
+        padding: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255,255,255,0.1)'
+    },
+    modalItemText: {
+        color: colors.white,
+        fontSize: 16
+    },
+    closeButton: {
+        marginTop: 15,
+        backgroundColor: colors.card,
+        padding: 10,
+        borderRadius: 8,
+        alignItems: 'center'
+    },
+    closeButtonText: {
+        color: '#ff4444',
+        fontSize: 16,
+        fontWeight: 'bold'
+    },
     container: { padding: 20, backgroundColor: colors.background, flexGrow: 1 },
     headerTitle: { color: colors.primary, fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
     section: { marginBottom: 25, backgroundColor: 'rgba(255,255,255,0.05)', padding: 15, borderRadius: 10 },
