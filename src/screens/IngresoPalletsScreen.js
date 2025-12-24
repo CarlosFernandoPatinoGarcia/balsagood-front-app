@@ -141,15 +141,20 @@ const IngresoPalletsScreen = () => {
                     espesor: 0, // Ya no hay espesor global único
                     cantidad_plantilla: 0 // Ya no hay cantidad global única
                 },
-                calificaciones: formData.calificaciones.map(c => ({
-                    largo: parseFloat(c.largo),
-                    espesor: parseFloat(c.espesor),
-                    cantidad: parseFloat(c.cantidad),
-                    es_castigado: c.castigado,
-                    largo_original: c.castigado ? parseFloat(c.largo_original) : parseFloat(c.largo)
-                    // Si el backend aun exige 'valor' o 'motivo', podrian fallar.
-                    // Asumiremos que el backend se adaptó a esto segun instrucciones del usuario.
-                }))
+                calificaciones: formData.calificaciones.map(c => {
+                    const l = parseFloat(c.largo);
+                    const lo_input = parseFloat(c.largo_original);
+                    // Si el usuario activó el switch o si el largo original es mayor al largo (implica castigo)
+                    const isCastigado = c.castigado || (lo_input > l && lo_input > 0);
+
+                    return {
+                        largo: l,
+                        espesor: parseFloat(c.espesor),
+                        cantidad: parseFloat(c.cantidad),
+                        es_castigado: isCastigado,
+                        largo_original: isCastigado ? lo_input : l
+                    };
+                })
             };
 
             const response = await api.post('/api/ingreso/ingreso-completo', payload);
