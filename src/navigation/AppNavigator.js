@@ -8,6 +8,7 @@ import IngresoPalletsScreen from '../screens/IngresoPalletsScreen';
 import ProduccionScreen from '../screens/ProduccionScreen';
 import AgrupacionScreen from '../screens/AgrupacionScreen';
 import GestionSecadoScreen from '../screens/GestionSecadoScreen';
+import DespachoLoteScreen from '../screens/DespachoLoteScreen';
 import { colors } from '../theme/colors';
 import { StatusBar } from 'react-native';
 
@@ -25,11 +26,12 @@ const AppNavigator = () => {
                     cardStyle: { backgroundColor: colors.background },
                 }}
             >
-                <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'WoodFlow' }} />
+                <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Producción Balsagood S.A.' }} />
                 <Stack.Screen name="IngresoPallets" component={IngresoPalletsScreen} options={{ title: 'Ingreso Pallets' }} />
                 <Stack.Screen name="Produccion" component={ProduccionScreen} options={{ title: 'Producción y Encolado' }} />
                 <Stack.Screen name="Agrupacion" component={AgrupacionScreen} options={{ title: 'Despacho' }} />
                 <Stack.Screen name="GestionSecado" component={GestionSecadoScreen} options={{ title: 'Gestión de Secado' }} />
+                <Stack.Screen name="DespachoLote" component={DespachoLoteScreen} options={{ title: 'Despacho a Taller' }} />
             </Stack.Navigator>
         </NavigationContainer>
     );

@@ -21,7 +21,6 @@ const CameraSelectorModal = ({ visible, onClose, cameras, onSelect }) => {
                             <TouchableOpacity style={styles.modalItem} onPress={() => onSelect(item)}>
                                 <Text style={styles.modalItemText}>
                                     {item.camaraDescripcion}
-                                    {/* Mostrar Capacidad Disponible si existe, si no, la total */}
                                     {item.capacidadDisponible != null
                                         ? ` (Disp: ${parseFloat(item.capacidadDisponible).toFixed(2)})`
                                         : ` (Cap: ${item.capacidadTotal || item.camaraCapacidad})`}
@@ -44,9 +43,8 @@ const DatePickerModal = ({ visible, onClose, onSelect, initialDate, title }) => 
     const [day, setDay] = useState(initialDate ? initialDate.split('-')[2] : new Date().getDate().toString().padStart(2, '0'));
 
     const handleConfirm = () => {
-        // Simple Validation
         if (!year || !month || !day) return;
-        const dateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T08:00:00`; // Appending time to match ISO format req roughly
+        const dateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00`;
         onSelect(dateStr);
     };
 
@@ -78,14 +76,13 @@ const DatePickerModal = ({ visible, onClose, onSelect, initialDate, title }) => 
 
 // --- Main Screen ---
 
-const GestionSecadoScreen = () => {
+const GestionSecadoScreen = ({ navigation }) => {
     const [activeTab, setActiveTab] = useState('pendientes'); // pendientes, proceso, historial
     const [palletsDisponibles, setPalletsDisponibles] = useState([]);
     const [selectedPallets, setSelectedPallets] = useState([]);
     const [camaras, setCamaras] = useState([]);
     const [lotes, setLotes] = useState([]);
 
-    // Función helper para obtener fecha local YYYY-MM-DD
     const getLocalDate = () => {
         const now = new Date();
         const year = now.getFullYear();
@@ -97,14 +94,12 @@ const GestionSecadoScreen = () => {
     const [formData, setFormData] = useState({
         idCamara: null,
         camaraDescripcion: '',
-        loteCodigo: '', // Nuevo campo obligatorio
-        // Usar fecha local
-        loteFechaInicio: getLocalDate() + 'T08:00:00',
+        loteCodigo: '',
+        loteFechaInicio: getLocalDate() + 'T00:00:00',
         loteFechaFin: '',
         loteObservaciones: ''
     });
 
-    // Modal States
     const [showCameraModal, setShowCameraModal] = useState(false);
     const [showStartPicker, setShowStartPicker] = useState(false);
     const [showEndPicker, setShowEndPicker] = useState(false);
@@ -113,18 +108,21 @@ const GestionSecadoScreen = () => {
         fetchData();
     }, []);
 
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            fetchData();
+        });
+        return unsubscribe;
+    }, [navigation]);
+
     const fetchData = async () => {
         try {
-            // 1. Pallets Disponibles (Madera Verde)
-            // Endpoint updated to /api/secado/disponibles as per user request
             const resPallets = await api.get('/api/secado/disponibles');
             setPalletsDisponibles(resPallets.data || []);
 
-            // 2. Camaras Disponibles
             const resCamaras = await api.get('/api/camaras/estado/disponibles');
             setCamaras(resCamaras.data || []);
 
-            // 3. Lotes
             const resLotes = await api.get('/api/lotes-secado');
             setLotes(resLotes.data || []);
         } catch (error) {
@@ -143,24 +141,18 @@ const GestionSecadoScreen = () => {
     };
 
     const calculateSelectedBFT = () => {
-        // Ajustar ID matching: p.idPallet (DTO) en lugar de p.id_pallet
         const selected = palletsDisponibles.filter(p => selectedPallets.includes(p.idPallet));
         return selected.reduce((sum, p) => sum + (parseFloat(p.bftVerdeAceptado) || 0), 0);
     };
 
-    // Validation Logic
     const totalBFT = calculateSelectedBFT();
     const selectedCamera = camaras.find(c => (c.idCamara || c.id) === formData.idCamara);
-    // Capacidad disponible: si viene del backend, usala. Si no, usa capacidad total como fallback (o Infinite si no hay data)
-    // Pero el requisito dice que capacityDisponible viene en el DTO.
     const availableCapacity = selectedCamera ? parseFloat(selectedCamera.capacidadDisponible || selectedCamera.camaraCapacidad || 0) : 0;
-
-    // Validar si excede capacidad. Solo validar si se ha seleccionado cámara.
     const isCapacityExceeded = formData.idCamara && totalBFT > availableCapacity;
 
     const isValid =
         formData.idCamara !== null &&
-        formData.loteCodigo.trim() !== '' && // Validar código obligatorio
+        formData.loteCodigo.trim() !== '' &&
         formData.loteFechaInicio &&
         formData.loteFechaFin &&
         selectedPallets.length > 0 &&
@@ -171,19 +163,15 @@ const GestionSecadoScreen = () => {
 
         const payload = {
             idCamara: parseInt(formData.idCamara),
-            loteCodigo: formData.loteCodigo, // Enviamos el nuevo campo
+            loteCodigo: formData.loteCodigo,
             loteFechaInicio: formData.loteFechaInicio,
             loteFechaFin: formData.loteFechaFin,
             idPallets: selectedPallets.map(id => parseInt(id)),
             loteObservaciones: formData.loteObservaciones
         };
 
-        console.log("SENDING PAYLOAD:", JSON.stringify(payload, null, 2));
-
         try {
             const response = await api.post('/api/secado/crear', payload);
-            console.log("RESPONSE SUCCESS:", response.data);
-
             const estado = response.data?.estado || 'PROGRAMADO';
             Alert.alert('Éxito', `Lote Creado. Estado: ${estado}`);
 
@@ -191,20 +179,16 @@ const GestionSecadoScreen = () => {
                 idCamara: null,
                 camaraDescripcion: '',
                 loteCodigo: '',
-                // fecha local
-                loteFechaInicio: getLocalDate() + 'T08:00:00',
+                loteFechaInicio: getLocalDate() + 'T00:00:00',
                 loteFechaFin: '',
                 loteObservaciones: ''
             });
-            console.log("Datos del formulario reseteados");
             setSelectedPallets([]);
             fetchData();
             setActiveTab('proceso');
         } catch (error) {
             console.log("ERROR CREATE LOTE:", error);
             if (error.response) {
-                console.log("SERVER ERROR DATA:", JSON.stringify(error.response.data, null, 2));
-                // Mostrar mensaje específico del backend si existe (e.g., validación de capacidad)
                 const errorMsg = error.response.data?.message || JSON.stringify(error.response.data);
                 Alert.alert('Error', errorMsg);
             } else {
@@ -215,10 +199,6 @@ const GestionSecadoScreen = () => {
 
     // --- Tab 2/3: Lotes Logic ---
 
-    // Updated Logic:
-    // Process = Not 'FINALIZADO'
-    // History = 'FINALIZADO'
-
     const handleFinalizeLote = (lote) => {
         Alert.alert(
             'Confirmar Finalización',
@@ -228,13 +208,24 @@ const GestionSecadoScreen = () => {
                 {
                     text: 'Confirmar', onPress: async () => {
                         try {
-                            await api.patch(`/api/secado/finalizar/${lote.idLote}`);
+                            const now = new Date();
+                            const year = now.getFullYear();
+                            const month = String(now.getMonth() + 1).padStart(2, '0');
+                            const day = String(now.getDate()).padStart(2, '0');
+                            const hours = String(now.getHours()).padStart(2, '0');
+                            const minutes = String(now.getMinutes()).padStart(2, '0');
+                            const seconds = String(now.getSeconds()).padStart(2, '0');
+                            const exactTime = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+
+                            await api.patch(`/api/secado/finalizar/${lote.idLote}`, {
+                                fechaFinalizacion: exactTime
+                            });
+
                             Alert.alert('Éxito', 'Lote enviado a Stock Seco');
                             fetchData();
                         } catch (error) {
                             console.error("ERROR FINALIZING LOTE:", error);
                             if (error.response) {
-                                console.log("SERVER ERROR FINALIZING:", JSON.stringify(error.response.data, null, 2));
                                 const errorMsg = error.response.data?.message || JSON.stringify(error.response.data);
                                 Alert.alert('Error del Servidor', `No se pudo finalizar.\n${errorMsg}`);
                             } else {
@@ -254,7 +245,6 @@ const GestionSecadoScreen = () => {
             <Text style={styles.sectionTitle}>Configuración de Lote</Text>
 
             <View style={styles.card}>
-                {/* Cámara Selector */}
                 <Text style={styles.label}>Cámara *</Text>
                 <TouchableOpacity style={styles.selector} onPress={() => setShowCameraModal(true)}>
                     <Text style={[styles.selectorText, !formData.idCamara && styles.placeholderText]}>
@@ -262,7 +252,6 @@ const GestionSecadoScreen = () => {
                     </Text>
                 </TouchableOpacity>
 
-                {/* Nuevo Campo: Lote Código */}
                 <Text style={[styles.label, { marginTop: 15 }]}>Código de Lote *</Text>
                 <TextInput
                     style={styles.input}
@@ -313,9 +302,6 @@ const GestionSecadoScreen = () => {
             </View>
 
             {palletsDisponibles.map((p, index) => {
-                // Robust ID check to fix "unique key" error
-                // Production Endpoint: idPallet
-                // Secado Endpoint: id_pallet
                 const id = p.idPallet || p.id;
                 const uniqueKey = id ? id.toString() : `fallback-${index}`;
 
@@ -325,19 +311,12 @@ const GestionSecadoScreen = () => {
                         style={[styles.palletItem, selectedPallets.includes(id) && styles.palletSelected]}
                         onPress={() => togglePalletSelection(id)}
                     >
-                        {/* 
-                           Display Logic:
-                           - If 'codigo' exists (Production Endpoint), show it.
-                           - Else show 'Pallet #' + pallet_numero/palletNumero 
-                         */}
                         <Text style={styles.palletText}>
-                            {/* DTO Mappings: codigo, palletNumero, recepcion.proveedor.provNombre */}
                             {p.codigo ? `Código: ${p.codigo}` : `Pallet #${p.palletNumero || '?'}`}
                             {p.recepcion?.proveedor?.provNombre ? ` - ${p.recepcion.proveedor.provNombre}` : ''}
                         </Text>
 
                         <Text style={styles.palletSub}>
-                            {/* Accedemos al numViaje dentro de recepcion */}
                             Viaje: {p.recepcion?.numViaje || '-'}
                             {p.bftVerdeAceptado ? ` • BFT: ${p.bftVerdeAceptado}` : ''}
                         </Text>
@@ -372,13 +351,11 @@ const GestionSecadoScreen = () => {
 
             <View style={{ height: 50 }} />
 
-            {/* Modals */}
             <CameraSelectorModal
                 visible={showCameraModal}
                 onClose={() => setShowCameraModal(false)}
                 cameras={camaras}
                 onSelect={(cam) => {
-                    // DTO Mappings: idCamara, camaraDescripcion
                     const id = cam.idCamara || cam.id;
                     setFormData({ ...formData, idCamara: id, camaraDescripcion: cam.camaraDescripcion || `Cámara ${id}` });
                     setShowCameraModal(false);
@@ -410,60 +387,113 @@ const GestionSecadoScreen = () => {
         </ScrollView>
     );
 
-    const renderLotesList = (dataLotes, isHistory) => (
-        <ScrollView style={styles.tabContent}>
-            {dataLotes.length === 0 && <Text style={styles.emptyText}>No hay lotes en esta categoría.</Text>}
-            {dataLotes.map(lote => {
-                // Estado esperado: LISTO PARA BFT
-                const isReady = lote.estado === 'LISTO PARA BFT';
-                return (
-                    // DTO Mapping: idLote
-                    <View key={lote.idLote} style={styles.loteCard}>
-                        <View style={styles.cardHeader}>
-                            <Text style={styles.cardTitle}>Lote #{lote.idLote}</Text>
-                            <View style={[
-                                styles.badge,
-                                isHistory ? styles.badgeHistory : (isReady ? styles.badgeReady : styles.badgeProcess)
-                            ]}>
-                                <Text style={styles.badgeText}>
-                                    {isHistory ? 'HISTORIAL' : (isReady ? 'LISTO PARA BFT' : (lote.estado || 'SECANDO'))}
-                                </Text>
+    const renderLotesList = (dataLotes, isHistory) => {
+        const sortedLotes = [...dataLotes].sort((a, b) => {
+            // Prioridad: STOCK SECO (FINALIZADO) primero en Proceso
+            if (!isHistory) {
+                const isAStock = a.estado === 'FINALIZADO';
+                const isBStock = b.estado === 'FINALIZADO';
+                if (isAStock && !isBStock) return -1;
+                if (!isAStock && isBStock) return 1;
+            }
+            return b.idLote - a.idLote;
+        });
+
+        return (
+            <ScrollView style={styles.tabContent}>
+                {sortedLotes.length === 0 && <Text style={styles.emptyText}>No hay lotes en esta categoría.</Text>}
+                {sortedLotes.map(lote => {
+                    const isReady = lote.estado === 'LISTO PARA BFT';
+                    const isStock = lote.estado === 'FINALIZADO'; // Stock Seco
+                    const isDespachado = lote.estado === 'DESPACHADO';
+
+                    // LÓGICA DE INTERACCIÓN:
+                    // - STOCK SECO (Proceso): Habilitado -> Navega a Despacho.
+                    // - DESPACHADO (Historial): Deshabilitado -> Solo Lectura.
+                    // - Otros (Secando, Listo): Deshabilitados (container), pero botones internos funcionan.
+                    const isInteractive = isStock;
+
+                    const handlePress = () => {
+                        if (isInteractive) {
+                            navigation.navigate('DespachoLote', { idLote: lote.idLote });
+                        }
+                    };
+
+                    return (
+                        <TouchableOpacity
+                            key={lote.idLote}
+                            style={[
+                                styles.loteCard,
+                                isDespachado && { borderLeftColor: '#FF9800' }, // Naranja para despachado
+                                isStock && { borderLeftColor: colors.primary, borderWidth: 1, borderColor: colors.primary } // Verde/Resaltado para Stock
+                            ]}
+                            onPress={handlePress}
+                            disabled={!isInteractive} // SOLO STOCK SECO ES PRESIONABLE
+                            activeOpacity={0.7}
+                        >
+                            <View style={styles.cardHeader}>
+                                <Text style={styles.cardTitle}>Lote #{lote.loteCodigo || lote.idLote}</Text>
+                                <View style={[
+                                    styles.badge,
+                                    isDespachado ? { backgroundColor: '#FF9800' } :
+                                        isStock ? styles.badgeHistory :
+                                            (isReady ? styles.badgeReady : styles.badgeProcess)
+                                ]}>
+                                    <Text style={styles.badgeText}>
+                                        {isDespachado ? 'DESPACHADO' :
+                                            isStock ? 'STOCK SECO' :
+                                                (isReady ? 'LISTO PARA BFT' : (lote.estado || 'SECANDO'))}
+                                    </Text>
+                                </View>
                             </View>
-                        </View>
 
-                        {/* DTO Mapping: camara.idCamara */}
-                        <Text style={styles.cardSub}>Cámara {lote.camara?.idCamara || '?'} • {lote.especie || 'Balsa'}</Text>
+                            <Text style={styles.cardSub}>Cámara {lote.camara?.idCamara || '?'} • {lote.especie || 'Balsa'}</Text>
 
-                        <View style={styles.cardBody}>
-                            {/* DTO Mappings: loteFechaInicio, loteFechaFin, bftTotalLote */}
-                            <Text style={styles.cardInfo}>Inicio: {lote.loteFechaInicio ? lote.loteFechaInicio.split('T')[0] : '-'}</Text>
-                            <Text style={styles.cardInfo}>Fin Est: {lote.loteFechaFin ? lote.loteFechaFin.split('T')[0] : '-'}</Text>
-                            {isHistory && (
-                                <Text style={[styles.cardInfo, { marginTop: 5, color: colors.primary, fontWeight: 'bold' }]}>
+                            <View style={styles.cardBody}>
+                                <Text style={styles.cardInfo}>Inicio: {lote.loteFechaInicio ? lote.loteFechaInicio.split('T')[0] : '-'}</Text>
+                                <Text style={styles.cardInfo}>Fin Est: {lote.loteFechaFin ? lote.loteFechaFin.split('T')[0] : '-'}</Text>
 
+                                {/* MOSTRAR BFT */}
+                                {(isStock || isDespachado) && (
+                                    <View style={{ marginTop: 5 }}>
+                                        <Text style={[styles.cardInfo, { color: colors.primary, fontWeight: 'bold' }]}>
+                                            BFT Seco: {lote.bftTotalLote || lote.bftLoteSeco || '---'}
+                                        </Text>
 
-                                    BFT Total: {lote.bftTotalLote}
-                                </Text>
+                                        {/* MENSAJE SOLO PARA STOCK SECO */}
+                                        {isStock && (
+                                            <Text style={{ color: colors.textSecondary, fontSize: 10, marginTop: 2, fontStyle: 'italic' }}>
+                                                Toque para despachar a taller →
+                                            </Text>
+                                        )}
+                                    </View>
+                                )}
+                            </View>
+
+                            {/* Botón de Finalizar Secado (Solo aparece si NO es historial y está Listo) */}
+                            {!isHistory && isReady && (
+                                <TouchableOpacity
+                                    style={styles.finalizeBtn}
+                                    onPress={() => handleFinalizeLote(lote)}
+                                >
+                                    <Text style={styles.finalizeBtnText}>Finalizar y Enviar a Stock</Text>
+                                </TouchableOpacity>
                             )}
-                        </View>
+                        </TouchableOpacity>
+                    );
+                })}
+                <View style={{ height: 50 }} />
+            </ScrollView>
+        )
+    };
 
-                        {!isHistory && isReady && (
-                            <TouchableOpacity
-                                style={styles.finalizeBtn}
-                                onPress={() => handleFinalizeLote(lote)}
-                            >
-                                <Text style={styles.finalizeBtnText}>Finalizar y Enviar a Stock</Text>
-                            </TouchableOpacity>
-                        )}
-                    </View>
-                );
-            })}
-            <View style={{ height: 50 }} />
-        </ScrollView>
-    );
+    // --- FILTROS DE TABS ---
 
-    const lotesProceso = lotes.filter(l => l.estado !== 'FINALIZADO');
-    const lotesHistorial = lotes.filter(l => l.estado === 'FINALIZADO');
+    // 1. Proceso: Todo lo que NO sea DESPACHADO
+    const lotesProceso = lotes.filter(l => l.estado !== 'DESPACHADO');
+
+    // 2. Historial: Solo lo que SÍ sea DESPACHADO
+    const lotesHistorial = lotes.filter(l => l.estado === 'DESPACHADO');
 
     return (
         <View style={styles.container}>
@@ -506,25 +536,13 @@ const styles = StyleSheet.create({
     label: { color: colors.textSecondary, marginBottom: 8 },
     input: { backgroundColor: 'rgba(255,255,255,0.1)', color: colors.white, padding: 12, borderRadius: 8 },
 
-    // Summary Styles (Requested fix)
-    summaryContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 10,
-        paddingHorizontal: 5
-    },
-    summaryText: {
-        color: colors.white,
-        fontWeight: 'bold',
-        fontSize: 16
-    },
+    summaryContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, paddingHorizontal: 5 },
+    summaryText: { color: colors.white, fontWeight: 'bold', fontSize: 16 },
 
-    // Selectors
     selector: { backgroundColor: 'rgba(255,255,255,0.1)', padding: 12, borderRadius: 8 },
     selectorText: { color: colors.white },
     placeholderText: { color: colors.textSecondary },
 
-    // Pallet Item
     palletItem: { backgroundColor: 'rgba(255,255,255,0.05)', padding: 15, borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: 'transparent' },
     palletSelected: { borderColor: colors.primary, backgroundColor: 'rgba(76, 175, 80, 0.1)' },
     palletText: { color: colors.white, fontWeight: 'bold', fontSize: 16 },
@@ -535,7 +553,6 @@ const styles = StyleSheet.create({
     actionBtnText: { color: colors.background, fontWeight: 'bold' },
     validationText: { color: colors.danger, textAlign: 'center', marginTop: 10, fontSize: 12 },
 
-    // Lote Card
     loteCard: { backgroundColor: colors.card, padding: 15, borderRadius: 10, marginBottom: 15, borderLeftWidth: 5, borderLeftColor: colors.primary },
     cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
     cardTitle: { color: colors.white, fontSize: 16, fontWeight: 'bold' },
@@ -550,7 +567,6 @@ const styles = StyleSheet.create({
     finalizeBtn: { backgroundColor: colors.primary, marginTop: 15, padding: 12, borderRadius: 5, alignItems: 'center' },
     finalizeBtnText: { color: colors.background, fontWeight: 'bold' },
 
-    // Modals
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center' },
     modalContent: { width: '85%', backgroundColor: colors.background, borderRadius: 15, padding: 20, maxHeight: '70%', borderWidth: 1, borderColor: colors.border },
     modalContentSmall: { width: '80%', backgroundColor: colors.background, borderRadius: 15, padding: 20, borderWidth: 1, borderColor: colors.border },
@@ -562,7 +578,6 @@ const styles = StyleSheet.create({
     confirmBtn: { marginTop: 15, padding: 10, alignItems: 'center', backgroundColor: colors.primary, borderRadius: 8 },
     confirmBtnText: { color: colors.background, fontWeight: 'bold' },
 
-    // Date Picker Styles
     dateRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5 },
     dateInput: { backgroundColor: 'rgba(255,255,255,0.1)', color: colors.white, padding: 10, borderRadius: 5, width: 60, textAlign: 'center', fontSize: 18 },
     dateSep: { color: colors.white, fontSize: 20 },
