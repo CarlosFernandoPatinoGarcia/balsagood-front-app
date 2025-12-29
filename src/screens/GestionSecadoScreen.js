@@ -19,7 +19,13 @@ const CameraSelectorModal = ({ visible, onClose, cameras, onSelect }) => {
                         }}
                         renderItem={({ item }) => (
                             <TouchableOpacity style={styles.modalItem} onPress={() => onSelect(item)}>
-                                <Text style={styles.modalItemText}>{item.camaraDescripcion} (Cap: {item.camaraCapacidad})</Text>
+                                <Text style={styles.modalItemText}>
+                                    {item.camaraDescripcion}
+                                    {/* Mostrar Capacidad Disponible si existe, si no, la total */}
+                                    {item.capacidadDisponible != null
+                                        ? ` (Disp: ${parseFloat(item.capacidadDisponible).toFixed(2)})`
+                                        : ` (Cap: ${item.capacidadTotal || item.camaraCapacidad})`}
+                                </Text>
                             </TouchableOpacity>
                         )}
                     />
@@ -91,6 +97,7 @@ const GestionSecadoScreen = () => {
     const [formData, setFormData] = useState({
         idCamara: null,
         camaraDescripcion: '',
+        loteCodigo: '', // Nuevo campo obligatorio
         // Usar fecha local
         loteFechaInicio: getLocalDate() + 'T08:00:00',
         loteFechaFin: '',
@@ -138,21 +145,33 @@ const GestionSecadoScreen = () => {
     const calculateSelectedBFT = () => {
         // Ajustar ID matching: p.idPallet (DTO) en lugar de p.id_pallet
         const selected = palletsDisponibles.filter(p => selectedPallets.includes(p.idPallet));
-        return selected.reduce((sum, p) => sum + (parseFloat(p.bftVerdeAceptado) || 0), 0).toFixed(2);
+        return selected.reduce((sum, p) => sum + (parseFloat(p.bftVerdeAceptado) || 0), 0);
     };
 
     // Validation Logic
+    const totalBFT = calculateSelectedBFT();
+    const selectedCamera = camaras.find(c => (c.idCamara || c.id) === formData.idCamara);
+    // Capacidad disponible: si viene del backend, usala. Si no, usa capacidad total como fallback (o Infinite si no hay data)
+    // Pero el requisito dice que capacityDisponible viene en el DTO.
+    const availableCapacity = selectedCamera ? parseFloat(selectedCamera.capacidadDisponible || selectedCamera.camaraCapacidad || 0) : 0;
+
+    // Validar si excede capacidad. Solo validar si se ha seleccionado cámara.
+    const isCapacityExceeded = formData.idCamara && totalBFT > availableCapacity;
+
     const isValid =
         formData.idCamara !== null &&
+        formData.loteCodigo.trim() !== '' && // Validar código obligatorio
         formData.loteFechaInicio &&
         formData.loteFechaFin &&
-        selectedPallets.length > 0;
+        selectedPallets.length > 0 &&
+        !isCapacityExceeded;
 
     const handleCreateLote = async () => {
         if (!isValid) return;
 
         const payload = {
             idCamara: parseInt(formData.idCamara),
+            loteCodigo: formData.loteCodigo, // Enviamos el nuevo campo
             loteFechaInicio: formData.loteFechaInicio,
             loteFechaFin: formData.loteFechaFin,
             idPallets: selectedPallets.map(id => parseInt(id)),
@@ -171,6 +190,7 @@ const GestionSecadoScreen = () => {
             setFormData({
                 idCamara: null,
                 camaraDescripcion: '',
+                loteCodigo: '',
                 // fecha local
                 loteFechaInicio: getLocalDate() + 'T08:00:00',
                 loteFechaFin: '',
@@ -184,7 +204,9 @@ const GestionSecadoScreen = () => {
             console.log("ERROR CREATE LOTE:", error);
             if (error.response) {
                 console.log("SERVER ERROR DATA:", JSON.stringify(error.response.data, null, 2));
-                Alert.alert('Error del Servidor', `Status: ${error.response.status}\nMsg: ${JSON.stringify(error.response.data)}`);
+                // Mostrar mensaje específico del backend si existe (e.g., validación de capacidad)
+                const errorMsg = error.response.data?.message || JSON.stringify(error.response.data);
+                Alert.alert('Error', errorMsg);
             } else {
                 Alert.alert('Error', error.message || 'No se pudo crear el lote');
             }
@@ -210,8 +232,14 @@ const GestionSecadoScreen = () => {
                             Alert.alert('Éxito', 'Lote enviado a Stock Seco');
                             fetchData();
                         } catch (error) {
-                            console.error(error);
-                            Alert.alert('Error', 'No se pudo finalizar el lote');
+                            console.error("ERROR FINALIZING LOTE:", error);
+                            if (error.response) {
+                                console.log("SERVER ERROR FINALIZING:", JSON.stringify(error.response.data, null, 2));
+                                const errorMsg = error.response.data?.message || JSON.stringify(error.response.data);
+                                Alert.alert('Error del Servidor', `No se pudo finalizar.\n${errorMsg}`);
+                            } else {
+                                Alert.alert('Error', error.message || 'No se pudo finalizar el lote');
+                            }
                         }
                     }
                 }
@@ -233,6 +261,17 @@ const GestionSecadoScreen = () => {
                         {formData.camaraDescripcion || 'Seleccionar Cámara...'}
                     </Text>
                 </TouchableOpacity>
+
+                {/* Nuevo Campo: Lote Código */}
+                <Text style={[styles.label, { marginTop: 15 }]}>Código de Lote *</Text>
+                <TextInput
+                    style={styles.input}
+                    value={formData.loteCodigo}
+                    onChangeText={t => setFormData({ ...formData, loteCodigo: t })}
+                    placeholder="Ingrese código manual (e.g. 1500)"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="default"
+                />
 
                 <View style={styles.row}>
                     <View style={styles.col}>
@@ -264,7 +303,13 @@ const GestionSecadoScreen = () => {
             <Text style={styles.sectionTitle}>Seleccionar Pallets (Verdes)</Text>
             <View style={styles.summaryContainer}>
                 <Text style={styles.summaryText}>Seleccionados: {selectedPallets.length}</Text>
-                <Text style={styles.summaryText}>Total BFT: {calculateSelectedBFT()}</Text>
+                <Text style={[
+                    styles.summaryText,
+                    isCapacityExceeded ? { color: colors.danger } : {}
+                ]}>
+                    Total BFT: {totalBFT.toFixed(2)}
+                    {formData.idCamara && ` / ${availableCapacity.toFixed(2)}`}
+                </Text>
             </View>
 
             {palletsDisponibles.map((p, index) => {
@@ -312,9 +357,17 @@ const GestionSecadoScreen = () => {
             </TouchableOpacity>
 
             {!isValid && (
-                <Text style={styles.validationText}>
-                    Complete cámara, fechas y seleccione al menos un pallet.
-                </Text>
+                <View>
+                    <Text style={styles.validationText}>
+                        Complete cámara, fechas y seleccione al menos un pallet.
+                    </Text>
+                    {isCapacityExceeded && (
+                        <Text style={[styles.validationText, { color: colors.danger, fontWeight: 'bold' }]}>
+                            ¡La capacidad de la cámara es insuficiente!
+                            {'\n'}Requerido: {totalBFT.toFixed(2)} - Disponible: {availableCapacity.toFixed(2)}
+                        </Text>
+                    )}
+                </View>
             )}
 
             <View style={{ height: 50 }} />

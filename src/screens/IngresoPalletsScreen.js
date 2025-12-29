@@ -3,10 +3,60 @@ import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert,
 import api from '../api/api';
 import { colors } from '../theme/colors';
 
+const DatePickerModal = ({ visible, onClose, onSelect, initialDate, title }) => {
+    const [year, setYear] = useState(initialDate ? initialDate.split('-')[0] : new Date().getFullYear().toString());
+    const [month, setMonth] = useState(initialDate ? initialDate.split('-')[1] : (new Date().getMonth() + 1).toString().padStart(2, '0'));
+    const [day, setDay] = useState(initialDate ? initialDate.split('-')[2] : new Date().getDate().toString().padStart(2, '0'));
+
+    useEffect(() => {
+        if (visible && initialDate) {
+            const parts = initialDate.split('-');
+            if (parts.length >= 3) {
+                setYear(parts[0]);
+                setMonth(parts[1]);
+                setDay(parts[2]);
+            }
+        }
+    }, [visible, initialDate]);
+
+    const handleConfirm = () => {
+        // Simple Validation
+        if (!year || !month || !day) return;
+        // Construct YYYY-MM-DD
+        const dateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        onSelect(dateStr);
+    };
+
+    return (
+        <Modal visible={visible} transparent animationType="fade">
+            <View style={styles.modalOverlay}>
+                <View style={styles.modalContentSmall}>
+                    <Text style={styles.modalTitle}>{title || "Seleccionar Fecha"}</Text>
+                    <View style={styles.dateRow}>
+                        <TextInput style={styles.dateInput} value={day} onChangeText={setDay} placeholder="DD" keyboardType="numeric" maxLength={2} />
+                        <Text style={styles.dateSep}>/</Text>
+                        <TextInput style={styles.dateInput} value={month} onChangeText={setMonth} placeholder="MM" keyboardType="numeric" maxLength={2} />
+                        <Text style={styles.dateSep}>/</Text>
+                        <TextInput style={styles.dateInput} value={year} onChangeText={setYear} placeholder="YYYY" keyboardType="numeric" maxLength={4} />
+                    </View>
+                    <View style={styles.modalBtnRow}>
+                        <TouchableOpacity style={[styles.closeBtn, { flex: 1, marginRight: 5 }]} onPress={onClose}>
+                            <Text style={styles.closeBtnText}>Cancelar</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.confirmBtn, { flex: 1, marginLeft: 5 }]} onPress={handleConfirm}>
+                            <Text style={styles.confirmBtnText}>Confirmar</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        </Modal>
+    );
+};
+
 const IngresoPalletsScreen = () => {
     const [formData, setFormData] = useState({
         num_viaje: '',
-        fecha_ingreso: new Date().toISOString().split('T')[0], // Default YYYY-MM-DD
+        fecha_ingreso: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD local format
         prov_nombre: '',
         id_proveedor: null, // Nuevo campo ID
         pallet_numero: '',
@@ -17,6 +67,12 @@ const IngresoPalletsScreen = () => {
 
     const [proveedores, setProveedores] = useState([]);
     const [modalVisible, setModalVisible] = useState(false);
+    const [newProviderModalVisible, setNewProviderModalVisible] = useState(false);
+    const [newProviderName, setNewProviderName] = useState('');
+
+    // Date Picker state
+    // const [date, setDate] = useState(new Date()); // No longer needed
+    const [openDatePicker, setOpenDatePicker] = useState(false);
 
     const [isValid, setIsValid] = useState(false);
     const [totalBFTRecibido, setTotalBFTRecibido] = useState(0);
@@ -211,23 +267,49 @@ const IngresoPalletsScreen = () => {
                     />
 
                     <Text style={styles.label}>Fecha Ingreso (YYYY-MM-DD)</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={formData.fecha_ingreso}
-                        onChangeText={(text) => handleChange('fecha_ingreso', text)}
-                        placeholder="2024-01-01"
-                        placeholderTextColor={colors.textSecondary}
+                    <TouchableOpacity
+                        style={[styles.input, { justifyContent: 'center' }]}
+                        onPress={() => setOpenDatePicker(true)}
+                    >
+                        <Text style={{ color: colors.white }}>{formData.fecha_ingreso}</Text>
+                    </TouchableOpacity>
+
+                    <DatePickerModal
+                        visible={openDatePicker}
+                        onClose={() => setOpenDatePicker(false)}
+                        initialDate={formData.fecha_ingreso}
+                        title="Fecha Ingreso"
+                        onSelect={(dateStr) => {
+                            handleChange('fecha_ingreso', dateStr);
+                            setOpenDatePicker(false);
+                        }}
                     />
 
                     <Text style={styles.label}>Nombre Proveedor *</Text>
-                    <TouchableOpacity
-                        style={[styles.input, { justifyContent: 'center' }]}
-                        onPress={() => setModalVisible(true)}
-                    >
-                        <Text style={{ color: formData.prov_nombre ? colors.white : colors.textSecondary }}>
-                            {formData.prov_nombre || "Seleccione Proveedor"}
-                        </Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
+                        <TouchableOpacity
+                            style={[styles.input, { flex: 1, marginBottom: 0, justifyContent: 'center' }]}
+                            onPress={() => setModalVisible(true)}
+                        >
+                            <Text style={{ color: formData.prov_nombre ? colors.white : colors.textSecondary }}>
+                                {formData.prov_nombre || "Seleccione Proveedor"}
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={{
+                                marginLeft: 10,
+                                backgroundColor: colors.primary,
+                                width: 50,
+                                height: 50,
+                                borderRadius: 25,
+                                justifyContent: 'center',
+                                alignItems: 'center'
+                            }}
+                            onPress={() => setNewProviderModalVisible(true)}
+                        >
+                            <Text style={{ color: colors.background, fontSize: 30, fontWeight: 'bold', lineHeight: 32 }}>+</Text>
+                        </TouchableOpacity>
+                    </View>
 
                     {/* Modal de Selección de Proveedor */}
                     <Modal
@@ -263,6 +345,52 @@ const IngresoPalletsScreen = () => {
                                 <TouchableOpacity
                                     style={styles.closeButton}
                                     onPress={() => setModalVisible(false)}
+                                >
+                                    <Text style={styles.closeButtonText}>Cancelar</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </Modal>
+
+                    {/* Modal Nuevo Proveedor */}
+                    <Modal
+                        animationType="slide"
+                        transparent={true}
+                        visible={newProviderModalVisible}
+                        onRequestClose={() => setNewProviderModalVisible(false)}
+                    >
+                        <View style={styles.modalOverlay}>
+                            <View style={styles.modalContent}>
+                                <Text style={styles.modalTitle}>Nuevo Proveedor</Text>
+                                <Text style={styles.label}>Nombre:</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={newProviderName}
+                                    onChangeText={setNewProviderName}
+                                    placeholder="Nombre del proveedor"
+                                    placeholderTextColor={colors.textSecondary}
+                                />
+                                <TouchableOpacity
+                                    style={styles.submitBtn}
+                                    onPress={() => {
+                                        if (newProviderName.trim()) {
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                prov_nombre: newProviderName.trim(),
+                                                id_proveedor: null
+                                            }));
+                                            setNewProviderModalVisible(false);
+                                            setNewProviderName('');
+                                        } else {
+                                            Alert.alert('Error', 'El nombre no puede estar vacío');
+                                        }
+                                    }}
+                                >
+                                    <Text style={styles.submitText}>Usar este Proveedor</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.closeButton}
+                                    onPress={() => setNewProviderModalVisible(false)}
                                 >
                                     <Text style={styles.closeButtonText}>Cancelar</Text>
                                 </TouchableOpacity>
@@ -478,6 +606,14 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: colors.border
     },
+    modalContentSmall: {
+        width: '80%',
+        backgroundColor: colors.background,
+        borderRadius: 15,
+        padding: 20,
+        borderWidth: 1,
+        borderColor: colors.border
+    },
     modalTitle: {
         color: colors.primary,
         fontSize: 20,
@@ -506,6 +642,16 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold'
     },
+    closeBtn: { marginTop: 15, padding: 10, alignItems: 'center', backgroundColor: colors.card, borderRadius: 8 },
+    closeBtnText: { color: colors.textSecondary },
+    confirmBtn: { marginTop: 15, padding: 10, alignItems: 'center', backgroundColor: colors.primary, borderRadius: 8 },
+    confirmBtnText: { color: colors.background, fontWeight: 'bold' },
+
+    // Date Picker Styles
+    dateRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5 },
+    dateInput: { backgroundColor: 'rgba(255,255,255,0.1)', color: colors.white, padding: 10, borderRadius: 5, width: 60, textAlign: 'center', fontSize: 18 },
+    dateSep: { color: colors.white, fontSize: 20 },
+    modalBtnRow: { flexDirection: 'row', marginTop: 20 },
     container: { padding: 20, backgroundColor: colors.background, flexGrow: 1 },
     headerTitle: { color: colors.primary, fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
     section: { marginBottom: 25, backgroundColor: 'rgba(255,255,255,0.05)', padding: 15, borderRadius: 10 },
