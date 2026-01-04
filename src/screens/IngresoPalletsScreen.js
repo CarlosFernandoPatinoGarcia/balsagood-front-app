@@ -69,6 +69,7 @@ const IngresoPalletsScreen = () => {
     const [modalVisible, setModalVisible] = useState(false);
     const [newProviderModalVisible, setNewProviderModalVisible] = useState(false);
     const [newProviderName, setNewProviderName] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Date Picker state
     // const [date, setDate] = useState(new Date()); // No longer needed
@@ -84,19 +85,27 @@ const IngresoPalletsScreen = () => {
     // Estado para trackear adición de filas
     const prevCalificacionesLength = React.useRef(formData.calificaciones.length);
 
-    // Cargar proveedores al montar
+    // Cargar proveedores con búsqueda
+    const fetchProveedores = async (query = '') => {
+        try {
+            const endpoint = query.trim()
+                ? `/api/proveedores/buscar?nombre=${encodeURIComponent(query)}`
+                : '/api/proveedores';
+            const response = await api.get(endpoint);
+            setProveedores(response.data);
+        } catch (error) {
+            console.error('Error fetching proveedores:', error);
+            // No alertar en cada tipeo fallido para no interrumpir
+        }
+    };
+
     useEffect(() => {
-        const fetchProveedores = async () => {
-            try {
-                const response = await api.get('/api/proveedores');
-                setProveedores(response.data);
-            } catch (error) {
-                console.error('Error fetching proveedores:', error);
-                Alert.alert('Error', 'No se pudieron cargar los proveedores');
-            }
-        };
-        fetchProveedores();
-    }, []);
+        const delayDebounceFn = setTimeout(() => {
+            fetchProveedores(searchQuery);
+        }, 500);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchQuery]);
 
     // Efecto para enfocar nuevo item cuando se agrega
     useEffect(() => {
@@ -321,6 +330,13 @@ const IngresoPalletsScreen = () => {
                         <View style={styles.modalOverlay}>
                             <View style={styles.modalContent}>
                                 <Text style={styles.modalTitle}>Seleccionar Proveedor</Text>
+                                <TextInput
+                                    style={styles.searchInput}
+                                    placeholder="Buscar proveedor..."
+                                    placeholderTextColor={colors.textSecondary}
+                                    value={searchQuery}
+                                    onChangeText={setSearchQuery}
+                                />
                                 <FlatList
                                     data={proveedores}
                                     keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
@@ -664,6 +680,16 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         padding: 10,
         marginBottom: 15,
+        borderWidth: 1,
+        borderColor: colors.border,
+        fontSize: 16
+    },
+    searchInput: {
+        backgroundColor: colors.card,
+        color: colors.white,
+        borderRadius: 8,
+        padding: 10,
+        marginBottom: 10,
         borderWidth: 1,
         borderColor: colors.border,
         fontSize: 16

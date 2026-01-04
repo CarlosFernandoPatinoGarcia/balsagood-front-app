@@ -257,9 +257,9 @@ const GestionSecadoScreen = ({ navigation }) => {
                     style={styles.input}
                     value={formData.loteCodigo}
                     onChangeText={t => setFormData({ ...formData, loteCodigo: t })}
-                    placeholder="Ingrese código manual (e.g. 1500)"
+                    placeholder="Ingrese código manual (Ej. 1500)"
                     placeholderTextColor={colors.textSecondary}
-                    keyboardType="default"
+                    keyboardType="numeric"
                 />
 
                 <View style={styles.row}>
