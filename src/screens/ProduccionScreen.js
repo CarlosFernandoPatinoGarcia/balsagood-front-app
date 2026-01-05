@@ -128,36 +128,63 @@ const ProduccionScreen = () => {
     };
 
     const handleRegisterGlue = async () => {
-        if (!glueWeight) return;
+        // 1. Validar que haya texto
+        if (!glueWeight) {
+            Alert.alert("Atención", "Por favor ingrese un peso.");
+            return;
+        }
 
         try {
-            const pesoCon = parseFloat(glueWeight);
+            // 2. Normalizar: Cambiar comas por puntos y limpiar espacios
+            const normalizedWeight = glueWeight.toString().replace(',', '.').trim();
+            const pesoCon = parseFloat(normalizedWeight);
+
+            // 3. Validar que sea un número real
+            if (isNaN(pesoCon)) {
+                Alert.alert('Error', 'El valor ingresado no es un número válido');
+                return;
+            }
+
+            // 4. Validar lógica de negocio (Peso Con > Peso Sin)
+            // Nota: Usamos una cadena de "OR" (||) para asegurar que encontramos el peso sin cola venga como venga del backend
             const pesoSin = selectedBlock.bloquePesoSinCola || selectedBlock.pesoSin || selectedBlock.bPesoSinCola || 0;
 
             if (pesoCon <= pesoSin) {
-                Alert.alert('Error', `Debe ingresar un valor mayor al peso sin cola (${pesoSin}g)`);
+                Alert.alert('Error', `El peso con cola (${pesoCon}g) debe ser mayor al peso sin cola (${pesoSin}g)`);
                 return;
             }
 
-            // Aseguramos el ID del bloque
-            const blockId = selectedBlock.id || selectedBlock.idBloque;
+            // 5. Obtener ID del bloque de forma segura
+            const blockId = selectedBlock.id || selectedBlock.idBloque || selectedBlock.id_bloque;
 
             if (!blockId) {
-                Alert.alert('Error', 'No se encontró el ID del bloque. Intente recargar.');
+                console.error("Error de ID: El objeto selectedBlock no tiene ID", selectedBlock);
+                Alert.alert('Error', 'No se pudo identificar el bloque. El ID es nulo.');
                 return;
             }
 
+            // 6. DEBUG: Ver qué estamos enviando realmente (Míralo en tu terminal)
+            console.log("Enviando a Backend:", {
+                url: `/api/bloques/${blockId}/encolado`,
+                payload: { bloquePesoConCola: pesoCon }
+            });
+
+            // 7. Llamada a la API
             await api.put(`/api/bloques/${blockId}/encolado`, {
                 bloquePesoConCola: pesoCon
             });
 
+            // Éxito
             setGlueModalVisible(false);
-            Alert.alert('Éxito', 'Peso con cola registrado');
-            fetchActiveOrder(); // Actualizar lista
+            setGlueWeight(''); // Limpiar input
+            Alert.alert('Éxito', 'Peso registrado correctamente');
+            fetchActiveOrder(); // Recargar la lista
+
         } catch (e) {
-            console.error(e);
-            const msg = typeof e.response?.data === 'string' ? e.response.data : (e.response?.data?.message || JSON.stringify(e.response?.data) || 'No se pudo registrar el peso');
-            Alert.alert('Error', `Status ${e.response?.status}: ${msg}`);
+            console.error("Error en petición:", e);
+            // Mostrar mensaje detallado si el backend lo envía
+            const msg = e.response?.data?.message || e.response?.data || "Error de conexión o validación";
+            Alert.alert('Error al guardar', `Servidor respondió: ${e.response?.status} - ${msg}`);
         }
     };
 

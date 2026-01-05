@@ -16,19 +16,18 @@ const AgrupacionScreen = () => {
     useEffect(() => {
         const total = bloques
             .filter(b => selectedIds.includes(b.idBloque))
-            .reduce((sum, b) => sum + (b.bancho || 0), 0);
+            .reduce((sum, b) => sum + (b.bloqueAncho || b.bancho || 0), 0);
         setAnchoTotal(total);
     }, [selectedIds, bloques]);
 
     const fetchBloques = async () => {
         try {
-            // En un escenario real, filtraríamos por estado en el backend: /bloques?estado=LISTO
-            const res = await api.get('/api/bloques');
-            // Filtramos localmente para demo: Listo o Encolado
-            const filtered = res.data.filter(b => b.bestado === 'LISTO' || b.bestado === 'ENCOLADO');
-            setBloques(filtered);
+            // endpoint específico para bloques encolados
+            const res = await api.get('/api/bloques/encolados');
+            setBloques(res.data);
         } catch (e) {
             console.error(e);
+            Alert.alert('Error', 'No se pudieron cargar los bloques encolados.');
         }
     };
 
@@ -48,23 +47,26 @@ const AgrupacionScreen = () => {
         }
 
         try {
-            // 1. Crear el Cuerpo
+            // Construcción del Payload para /api/cuerpos/agrupar
             const payload = {
                 idsBloques: selectedIds,
-                observacion: `Generado desde App. Ancho: ${anchoTotal}`
+                anchoFinal: anchoTotal,
+                observacion: `Generado desde App. Ancho: ${anchoTotal}"`,
+                // [MODULAR] Agrega aquí más campos si son necesarios en el futuro
+                // ejemploCampo: "Valor"
             };
+
             await api.post('/api/cuerpos/agrupar', payload);
 
-            Alert.alert('Éxito', 'Cuerpo creado y bloques asignados correctamente.');
+            Alert.alert('Éxito', 'Cuerpo creado y bloques asignados para exportación.');
 
             setSelectedIds([]);
             setAnchoTotal(0);
             fetchBloques(); // Recargar lista
         } catch (e) {
             console.error("Error al agrupar:", e);
-            // Mensaje de error más detallado si es posible
-            const msg = e.response?.data?.message || 'No se pudo procesar la agrupación.';
-            Alert.alert('Error', msg);
+            const msg = e.response?.data?.message || e.response?.data || 'No se pudo procesar la agrupación.';
+            Alert.alert('Error', `Status ${e.response?.status}: ${msg}`);
         }
     };
 
@@ -77,7 +79,7 @@ const AgrupacionScreen = () => {
             >
                 <View>
                     <Text style={styles.itemText}>Bloque #{item.idBloque}</Text>
-                    <Text style={styles.itemSub}>Ancho: {item.bancho}" | {item.bestado}</Text>
+                    <Text style={styles.itemSub}>Ancho: {item.bloqueAncho}" | {item.estado}</Text>
                 </View>
                 {isSelected && <Text style={styles.check}>✓</Text>}
             </TouchableOpacity>

@@ -27,7 +27,7 @@ export const configureApi = async (ip) => {
 
         api.defaults.baseURL = url;
         await AsyncStorage.setItem('API_IP', cleanIp);
-        console.log('API baseURL updated to:', url);
+
     } catch (e) {
         console.error("Error saving IP", e);
     }
