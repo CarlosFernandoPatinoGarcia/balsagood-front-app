@@ -101,14 +101,14 @@ const ProduccionScreen = () => {
         try {
             const payload = {
                 ordenTaller: { id: activeOrder.id },
-                codigo: newBlock.codigo, // String o number según BD, enviamos lo que capta el input (string)
-                bLargo: parseFloat(newBlock.largo),
+                bloqueCodigo: newBlock.codigo, // String o number según BD, enviamos lo que capta el input (string)
+                bloqueLargo: parseFloat(newBlock.largo),
                 // Asumiendo bAncho y bAlto opcionales o 0 por ahora
-                bAncho: 0,
-                bAlto: 0,
-                bPesoSinCola: parseFloat(newBlock.pesoSin),
-                bBftFinal: 0,
-                estado: 'PRESENTADO'
+                bloqueAncho: 0,
+                bloqueAlto: 0,
+                bloquePesoSinCola: parseFloat(newBlock.pesoSin),
+                bloqueBftFinal: 0,
+                bloqueEstado: 'PRESENTADO'
             };
 
             await api.post('/api/bloques', payload);
@@ -131,21 +131,24 @@ const ProduccionScreen = () => {
         if (!glueWeight) return;
 
         try {
-            // Validaciones de peso (opcional, igual que antes)
-            const pesoSin = selectedBlock.bPesoSinCola || selectedBlock.bpesoSinCola || 0;
             const pesoCon = parseFloat(glueWeight);
+            const pesoSin = selectedBlock.bloquePesoSinCola || selectedBlock.pesoSin || selectedBlock.bPesoSinCola || 0;
 
-            // Lógica simple de validación (ej. +350g)
-            if (pesoCon < pesoSin + 350) {
-                Alert.alert('Alerta de Calidad', `El peso parece bajo. Diferencia: ${(pesoCon - pesoSin).toFixed(2)}`);
-                // Permitimos continuar o retornamos? El usuario anterior solo alertaba. 
-                // Dejaremos que falle o pase según backend, o retornamos return; si es estricto.
-                // Por ahora solo alerta y return para obligar a corregir.
+            if (pesoCon <= pesoSin) {
+                Alert.alert('Error', `Debe ingresar un valor mayor al peso sin cola (${pesoSin}g)`);
                 return;
             }
 
-            await api.put(`/api/bloques/${selectedBlock.id}/encolado`, {
-                bPesoConCola: pesoCon
+            // Aseguramos el ID del bloque
+            const blockId = selectedBlock.id || selectedBlock.idBloque;
+
+            if (!blockId) {
+                Alert.alert('Error', 'No se encontró el ID del bloque. Intente recargar.');
+                return;
+            }
+
+            await api.put(`/api/bloques/${blockId}/encolado`, {
+                bloquePesoConCola: pesoCon
             });
 
             setGlueModalVisible(false);
@@ -188,8 +191,8 @@ const ProduccionScreen = () => {
             {/* ENCABEZADO ORDEN */}
             <View style={styles.header}>
                 <View>
-                    <Text style={styles.headerTitle}>Orden de Taller #{activeOrder.id}</Text>
-                    <Text style={styles.headerSubtitle}>Inicio: {new Date(activeOrder.fechaInicio).toLocaleTimeString()}</Text>
+                    <Text style={styles.headerTitle}>Orden de Taller #{activeOrder.id || activeOrder.idOrdenTaller || '---'}</Text>
+                    <Text style={styles.headerSubtitle}>Inicio: {activeOrder.fechaInicio ? new Date(activeOrder.fechaInicio).toLocaleTimeString() : '---'}</Text>
                 </View>
                 <TouchableOpacity style={styles.finishBtn} onPress={handleFinishOrder}>
                     <Text style={styles.finishBtnText}>FINALIZAR</Text>
@@ -258,11 +261,11 @@ const ProduccionScreen = () => {
 
                     {/* LISTA RECIENTE */}
                     <Text style={styles.listTitle}>Bloques Registrados</Text>
-                    {bloquesRecientes.map(item => (
-                        <View key={item.id} style={styles.itemRow}>
-                            <Text style={styles.itemTextBold}>{item.codigo || item.bCodigo || "S/C"}</Text>
-                            <Text style={styles.itemText}>L:{item.bLargo}</Text>
-                            <Text style={styles.itemText}>{item.bPesoSinCola}g</Text>
+                    {bloquesRecientes.map((item, index) => (
+                        <View key={item.id || index} style={styles.itemRow}>
+                            <Text style={styles.itemTextBold}>{item.bloqueCodigo || item.codigo || item.bCodigo || "S/C"}</Text>
+                            <Text style={styles.itemText}>L:{item.bloqueLargo || item.largo || item.bLargo || 0}</Text>
+                            <Text style={styles.itemText}>{item.bloquePesoSinCola || item.pesoSin || item.bPesoSinCola || 0}g</Text>
                             <Text style={[styles.itemBadge, { backgroundColor: item.estado === 'ENCOLADO' ? colors.success : colors.warning }]}>
                                 {item.estado}
                             </Text>
@@ -274,12 +277,12 @@ const ProduccionScreen = () => {
                     <Text style={styles.listTitle}>Seleccione bloque para Encolar</Text>
                     <FlatList
                         data={bloquesEncolado}
-                        keyExtractor={item => item.id.toString()}
+                        keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
                         renderItem={({ item }) => (
                             <TouchableOpacity style={styles.glueItem} onPress={() => openGlueModal(item)}>
                                 <View>
-                                    <Text style={styles.glueItemTitle}>Código: {item.codigo || item.bCodigo}</Text>
-                                    <Text style={styles.glueItemSub}>Peso Sin: {item.bPesoSinCola}g</Text>
+                                    <Text style={styles.glueItemTitle}>Código: {item.bloqueCodigo || item.codigo || item.bCodigo}</Text>
+                                    <Text style={styles.glueItemSub}>Peso Sin: {item.bloquePesoSinCola || item.pesoSin || item.bPesoSinCola}g</Text>
                                 </View>
                                 <Text style={styles.tapAction}>Pesar &gt;</Text>
                             </TouchableOpacity>
@@ -296,7 +299,7 @@ const ProduccionScreen = () => {
                         <Text style={styles.modalTitle}>Registro de Encolado</Text>
                         {selectedBlock && (
                             <Text style={styles.modalSub}>
-                                Bloque: {selectedBlock.codigo || selectedBlock.bCodigo} (Sin: {selectedBlock.bPesoSinCola}g)
+                                Bloque: {selectedBlock.bloqueCodigo || selectedBlock.codigo} (Sin: {selectedBlock.bloquePesoSinCola || selectedBlock.pesoSin}g)
                             </Text>
                         )}
 
