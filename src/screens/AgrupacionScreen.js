@@ -49,33 +49,22 @@ const AgrupacionScreen = () => {
 
         try {
             // 1. Crear el Cuerpo
-            const cuerpoRes = await api.post('/api/cuerpos', {
-                cuerpoAnchoFinal: anchoTotal,
-                cuerpoObservacion: `Generado desde App con ${selectedIds.length} bloques`
-            });
-            const nuevoCuerpo = cuerpoRes.data;
+            const payload = {
+                idsBloques: selectedIds,
+                observacion: `Generado desde App. Ancho: ${anchoTotal}`
+            };
+            await api.post('/api/cuerpos/agrupar', payload);
 
-            // 2. Actualizar los bloques seleccionados para pertenecer a este cuerpo
-            // Nota: Esto asume que tienes un endpoint para actualizar batch o un loop
-            // Aquí haremos un loop simple
-            const updatePromises = selectedIds.map(id => {
-                const bloqueOriginal = bloques.find(b => b.idBloque === id);
-                return api.put(`/api/bloques/${id}`, {
-                    ...bloqueOriginal, // mantienes datos viejos
-                    cuerpo: { idCuerpo: nuevoCuerpo.idCuerpo },
-                    bEstado: 'DESPACHO' // Nuevo estado
-                });
-            });
+            Alert.alert('Éxito', 'Cuerpo creado y bloques asignados correctamente.');
 
-            await Promise.all(updatePromises);
-
-            Alert.alert('Éxito', 'Cuerpo creado y bloques asignados para despacho.');
             setSelectedIds([]);
             setAnchoTotal(0);
             fetchBloques(); // Recargar lista
         } catch (e) {
-            Alert.alert('Error', 'No se pudo procesar la agrupación.');
-            console.error(e);
+            console.error("Error al agrupar:", e);
+            // Mensaje de error más detallado si es posible
+            const msg = e.response?.data?.message || 'No se pudo procesar la agrupación.';
+            Alert.alert('Error', msg);
         }
     };
 

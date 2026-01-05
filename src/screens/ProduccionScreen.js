@@ -156,7 +156,8 @@ const ProduccionScreen = () => {
             fetchActiveOrder(); // Actualizar lista
         } catch (e) {
             console.error(e);
-            Alert.alert('Error', 'No se pudo registrar el peso');
+            const msg = typeof e.response?.data === 'string' ? e.response.data : (e.response?.data?.message || JSON.stringify(e.response?.data) || 'No se pudo registrar el peso');
+            Alert.alert('Error', `Status ${e.response?.status}: ${msg}`);
         }
     };
 
