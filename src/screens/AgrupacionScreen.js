@@ -6,18 +6,27 @@ import { colors } from '../theme/colors';
 const AgrupacionScreen = () => {
     const [bloques, setBloques] = useState([]);
     const [selectedIds, setSelectedIds] = useState([]);
-    const [anchoTotal, setAnchoTotal] = useState(0);
+    // const [anchoTotal, setAnchoTotal] = useState(0);
+    const [largoTotal, setLargoTotal] = useState(0);
 
     useEffect(() => {
         fetchBloques();
     }, []);
 
     // Recalcular ancho total al seleccionar
+    // useEffect(() => {
+    //     const total = bloques
+    //         .filter(b => selectedIds.includes(b.idBloque))
+    //         .reduce((sum, b) => sum + (b.bloqueAncho || b.bancho || 0), 0);
+    //     setAnchoTotal(total);
+    // }, [selectedIds, bloques]);
+
+    // Recalcular largo total al seleccionar
     useEffect(() => {
         const total = bloques
             .filter(b => selectedIds.includes(b.idBloque))
-            .reduce((sum, b) => sum + (b.bloqueAncho || b.bancho || 0), 0);
-        setAnchoTotal(total);
+            .reduce((sum, b) => sum + (b.bloqueLargo || b.largo || 0), 0);
+        setLargoTotal(total);
     }, [selectedIds, bloques]);
 
     const fetchBloques = async () => {
@@ -40,28 +49,31 @@ const AgrupacionScreen = () => {
     };
 
     const handleCrearCuerpo = async () => {
-        // Validación de Rango 86 - 88
-        if (anchoTotal < 86 || anchoTotal > 88) {
-            Alert.alert('Rango Inválido', `El ancho acumulado (${anchoTotal}") debe estar entre 86" y 88".`);
+        // Validación de Rango mayor o igual a 86
+        if (largoTotal <= 86) {
+            Alert.alert('Rango Inválido', `El largo acumulado (${largoTotal}") debe ser mayor o igual a 86".`);
             return;
         }
 
         try {
             // Construcción del Payload para /api/cuerpos/agrupar
+            // Construcción del Payload para /api/cuerpos/agrupar
             const payload = {
                 idsBloques: selectedIds,
-                anchoFinal: anchoTotal,
-                observacion: `Generado desde App. Ancho: ${anchoTotal}"`,
+                // El modelo de dominio corregido espera largoFinal
+                largoFinal: largoTotal,
+                observacion: `Generado desde App. Largo Total: ${largoTotal}"`,
                 // [MODULAR] Agrega aquí más campos si son necesarios en el futuro
                 // ejemploCampo: "Valor"
             };
-
+            console.log("Payload:", payload);
             await api.post('/api/cuerpos/agrupar', payload);
 
             Alert.alert('Éxito', 'Cuerpo creado y bloques asignados para exportación.');
 
             setSelectedIds([]);
-            setAnchoTotal(0);
+            // setAnchoTotal(0);
+            setLargoTotal(0);
             fetchBloques(); // Recargar lista
         } catch (e) {
             console.error("Error al agrupar:", e);
@@ -79,7 +91,7 @@ const AgrupacionScreen = () => {
             >
                 <View>
                     <Text style={styles.itemText}>Bloque #{item.idBloque}</Text>
-                    <Text style={styles.itemSub}>Ancho: {item.bloqueAncho}" | {item.estado}</Text>
+                    <Text style={styles.itemSub}>Largo: {item.bloqueLargo}" | {item.estado}</Text>
                 </View>
                 {isSelected && <Text style={styles.check}>✓</Text>}
             </TouchableOpacity>
@@ -89,7 +101,7 @@ const AgrupacionScreen = () => {
     return (
         <View style={styles.container}>
             <Text style={styles.header}>Seleccione Bloques</Text>
-            <Text style={styles.subHeader}>Acumulado: {anchoTotal.toFixed(2)}" (Meta: 86-88)</Text>
+            <Text style={styles.subHeader}>Acumulado: {largoTotal.toFixed(2)}" (Meta: 86-88)</Text>
 
             <FlatList
                 data={bloques}
@@ -100,9 +112,9 @@ const AgrupacionScreen = () => {
 
             <View style={styles.footer}>
                 <TouchableOpacity
-                    style={[styles.btn, (anchoTotal < 86 || anchoTotal > 88) ? styles.btnDisabled : null]}
                     onPress={handleCrearCuerpo}
-                    disabled={anchoTotal < 86 || anchoTotal > 88}
+                    style={[styles.btn, (largoTotal <= 86) ? styles.btnDisabled : null]}
+                    disabled={largoTotal <= 86}
                 >
                     <Text style={styles.btnText}>CONFIRMAR AGRUPACIÓN</Text>
                 </TouchableOpacity>

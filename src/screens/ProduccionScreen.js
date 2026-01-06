@@ -25,6 +25,7 @@ const ProduccionScreen = () => {
             if (response.status === 204 || !response.data) {
                 setActiveOrder(null);
             } else {
+                console.log("Orden Activa Response:", response.data);
                 setActiveOrder(response.data);
             }
         } catch (error) {
@@ -99,18 +100,28 @@ const ProduccionScreen = () => {
         }
 
         try {
+            // Obtener ID de la orden de forma segura (Backend devuelve idOrden)
+            const orderId = activeOrder.id || activeOrder.idOrdenTaller || activeOrder.idOrden;
+            if (!orderId) {
+                Alert.alert("Error", "No se identifica la orden activa (ID nulo)");
+                return;
+            }
+
             const payload = {
-                ordenTaller: { id: activeOrder.id },
-                bloqueCodigo: newBlock.codigo, // String o number según BD, enviamos lo que capta el input (string)
+                // Usamos idOrden ya que así viene en el GET, es lo más probable que espere el POST
+                ordenTaller: { idOrden: orderId },
+                bloqueCodigo: newBlock.codigo,
                 bloqueLargo: parseFloat(newBlock.largo),
-                // Asumiendo bAncho y bAlto opcionales o 0 por ahora
-                bloqueAncho: 0,
-                bloqueAlto: 0,
+                bloqueAncho: 24,
+                bloqueAlto: 48,
                 bloquePesoSinCola: parseFloat(newBlock.pesoSin),
-                bloqueBftFinal: 0,
+                // Cálculo BFT: (ancho * alto * largo) / 144
+                bloqueBftFinal: (24 * 48 * parseFloat(newBlock.largo)) / 144,
                 bloqueEstado: 'PRESENTADO'
             };
 
+
+            console.log(payload);
             await api.post('/api/bloques', payload);
             Alert.alert('Éxito', 'Bloque registrado');
             setNewBlock({ codigo: '', largo: '', pesoSin: '' });
@@ -150,7 +161,7 @@ const ProduccionScreen = () => {
             const pesoSin = selectedBlock.bloquePesoSinCola || selectedBlock.pesoSin || selectedBlock.bPesoSinCola || 0;
 
             if (pesoCon <= pesoSin) {
-                Alert.alert('Error', `El peso con cola (${pesoCon}g) debe ser mayor al peso sin cola (${pesoSin}g)`);
+                Alert.alert('Error', `El peso con cola (${pesoCon}kg) debe ser mayor al peso sin cola (${pesoSin}g)`);
                 return;
             }
 
@@ -219,8 +230,10 @@ const ProduccionScreen = () => {
             {/* ENCABEZADO ORDEN */}
             <View style={styles.header}>
                 <View>
-                    <Text style={styles.headerTitle}>Orden de Taller #{activeOrder.id || activeOrder.idOrdenTaller || '---'}</Text>
-                    <Text style={styles.headerSubtitle}>Inicio: {activeOrder.fechaInicio ? new Date(activeOrder.fechaInicio).toLocaleTimeString() : '---'}</Text>
+                    <Text style={styles.headerTitle}>Orden de Taller #{activeOrder.id || activeOrder.idOrdenTaller || activeOrder.idOrden || '---'}</Text>
+                    <Text style={styles.headerSubtitle}>
+                        Inicio: {(activeOrder.fechaInicio || activeOrder.ordenFechaInicio) ? new Date(activeOrder.fechaInicio || activeOrder.ordenFechaInicio).toLocaleTimeString() : '---'}
+                    </Text>
                 </View>
                 <TouchableOpacity style={styles.finishBtn} onPress={handleFinishOrder}>
                     <Text style={styles.finishBtnText}>FINALIZAR</Text>
@@ -293,9 +306,11 @@ const ProduccionScreen = () => {
                         <View key={item.id || index} style={styles.itemRow}>
                             <Text style={styles.itemTextBold}>{item.bloqueCodigo || item.codigo || item.bCodigo || "S/C"}</Text>
                             <Text style={styles.itemText}>L:{item.bloqueLargo || item.largo || item.bLargo || 0}</Text>
-                            <Text style={styles.itemText}>{item.bloquePesoSinCola || item.pesoSin || item.bPesoSinCola || 0}g</Text>
+                            <Text style={styles.itemText}>BFT:{item.bloqueBftFinal || item.bftFinal || item.bBftFinal || 0}</Text>
+                            <Text style={styles.itemText}>{item.bloquePesoSinCola || item.pesoSin || item.bPesoSinCola || 0}kg</Text>
                             <Text style={[styles.itemBadge, { backgroundColor: item.estado === 'ENCOLADO' ? colors.success : colors.warning }]}>
-                                {item.estado}
+                                {/* Mostrar los dos primeros caracteres */}
+                                {item.estado ? item.estado.charAt(0) + item.estado.charAt(1) : ''}
                             </Text>
                         </View>
                     ))}
@@ -310,7 +325,7 @@ const ProduccionScreen = () => {
                             <TouchableOpacity style={styles.glueItem} onPress={() => openGlueModal(item)}>
                                 <View>
                                     <Text style={styles.glueItemTitle}>Código: {item.bloqueCodigo || item.codigo || item.bCodigo}</Text>
-                                    <Text style={styles.glueItemSub}>Peso Sin: {item.bloquePesoSinCola || item.pesoSin || item.bPesoSinCola}g</Text>
+                                    <Text style={styles.glueItemSub}>Peso Sin: {item.bloquePesoSinCola || item.pesoSin || item.bPesoSinCola}kg</Text>
                                 </View>
                                 <Text style={styles.tapAction}>Pesar &gt;</Text>
                             </TouchableOpacity>
@@ -327,11 +342,11 @@ const ProduccionScreen = () => {
                         <Text style={styles.modalTitle}>Registro de Encolado</Text>
                         {selectedBlock && (
                             <Text style={styles.modalSub}>
-                                Bloque: {selectedBlock.bloqueCodigo || selectedBlock.codigo} (Sin: {selectedBlock.bloquePesoSinCola || selectedBlock.pesoSin}g)
+                                Bloque: {selectedBlock.bloqueCodigo || selectedBlock.codigo} (Sin: {selectedBlock.bloquePesoSinCola || selectedBlock.pesoSin}kg)
                             </Text>
                         )}
 
-                        <Text style={styles.label}>Peso Con Cola (g)</Text>
+                        <Text style={styles.label}>Peso Con Cola (kg)</Text>
                         <TextInput
                             style={styles.input}
                             keyboardType="numeric"
@@ -393,7 +408,7 @@ const styles = StyleSheet.create({
     itemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, backgroundColor: colors.card, marginBottom: 5, borderRadius: 8 },
     itemText: { color: colors.textSecondary },
     itemTextBold: { color: colors.white, fontWeight: 'bold' },
-    itemBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, color: '#fff', fontSize: 10, fontWeight: 'bold', overflow: 'hidden' },
+    itemBadge: { paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4, color: '#fff', fontSize: 16, fontWeight: 'bold', overflow: 'hidden' },
 
     // Encolado Items
     glueItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: colors.card, marginBottom: 10, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: colors.warning },
