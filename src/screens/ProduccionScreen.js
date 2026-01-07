@@ -10,7 +10,7 @@ const ProduccionScreen = () => {
     const [activeTab, setActiveTab] = useState('NUEVO'); // 'NUEVO' | 'ENCOLADO'
 
     // Formulario Nuevo Bloque
-    const [newBlock, setNewBlock] = useState({ codigo: '', largo: '', pesoSin: '' });
+    const [newBlock, setNewBlock] = useState({ codigo: '', largo: '', pesoSin: '', observacion: '' });
 
     // Estado Encolado (Modal)
     const [glueModalVisible, setGlueModalVisible] = useState(false);
@@ -20,17 +20,30 @@ const ProduccionScreen = () => {
     const fetchActiveOrder = async () => {
         setLoading(true);
         try {
-            const response = await api.get('/api/ordenes-taller/activa');
-            // Si retorna 204 o vacío, es null
+            let response = await api.get('/api/ordenes-taller/activa');
+
+            // Si retorna 204 o vacío, significa que no hay orden activa.
+            // La creamos automáticamente "por debajo".
             if (response.status === 204 || !response.data) {
-                setActiveOrder(null);
-            } else {
-                console.log("Orden Activa Response:", response.data);
+                console.log("No hay orden activa, auto-generando orden diaria...");
+                try {
+                    await api.post('/api/ordenes-taller/iniciar');
+                    // Volvemos a consultar para obtener la orden recién creada
+                    response = await api.get('/api/ordenes-taller/activa');
+                    console.log("Orden auto-generada con éxito.");
+                } catch (createErr) {
+                    console.error("Error al auto-generar orden:", createErr);
+                    // Si falla la creación, no podemos hacer mucho más que avisar,
+                    // pero intentaremos que no bloquee fatalmente si es un error de red temporal.
+                }
+            }
+
+            if (response.data) {
+                console.log("Orden Activa cargada:", response.data);
                 setActiveOrder(response.data);
             }
         } catch (error) {
-            console.error(error);
-            setActiveOrder(null);
+            console.error("Error cargando orden:", error);
         } finally {
             setLoading(false);
         }
@@ -44,12 +57,22 @@ const ProduccionScreen = () => {
 
     const handleCreateBlock = async () => {
         if (!newBlock.codigo || !newBlock.largo || !newBlock.pesoSin) {
-            Alert.alert('Error', 'Complete todos los campos');
+            Alert.alert('Error', 'Complete todos los campos obligatorios');
+            return;
+        }
+
+        // Recuperamos el ID de la orden activa si existe
+        const orderId = activeOrder?.id || activeOrder?.idOrdenTaller || activeOrder?.idOrden;
+
+        // Si el backend requiere obligatoriamente asociar a una orden:
+        if (!orderId) {
+            Alert.alert('Atención', 'No se ha detectado una orden de taller activa para hoy. Asegúrese de que el sistema haya iniciado el día o consulte con soporte.');
             return;
         }
 
         try {
             const payload = {
+                ordenTaller: { idOrden: orderId }, // Restauramos la vinculación
                 bloqueCodigo: newBlock.codigo,
                 bloqueLargo: parseFloat(newBlock.largo),
                 bloqueAncho: 24,
@@ -57,18 +80,19 @@ const ProduccionScreen = () => {
                 bloquePesoSinCola: parseFloat(newBlock.pesoSin),
                 // Cálculo del volumen (BFT): largo * 8
                 bloqueBftFinal: (parseFloat(newBlock.largo)) * 8,
-                bloqueEstado: 'PRESENTADO'
+                bloqueEstado: 'PRESENTADO',
+                bloqueObservacion: newBlock.observacion // Campo de observación
             };
 
 
             console.log(payload);
             await api.post('/api/bloques', payload);
             Alert.alert('Éxito', 'Bloque registrado');
-            setNewBlock({ codigo: '', largo: '', pesoSin: '' });
+            setNewBlock({ codigo: '', largo: '', pesoSin: '', observacion: '' });
             fetchActiveOrder(); // Recargar lista de bloques
         } catch (e) {
             console.error(e);
-            Alert.alert('Error', 'Falló el registro del bloque');
+            Alert.alert('Error', 'Falló el registro del bloque. Verifique conexión.');
         }
     };
 
@@ -138,6 +162,15 @@ const ProduccionScreen = () => {
             Alert.alert('Error al guardar', `Servidor respondió: ${e.response?.status} - ${msg}`);
         }
     };
+
+    // Renderizado condicional
+    if (loading && !activeOrder) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center' }]}>
+                <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+        );
+    }
 
     // Filtrar bloques para Encolado
     const bloquesEncolado = activeOrder && activeOrder.bloques ? activeOrder.bloques.filter(b => b.estado === 'PRESENTADO') : [];
@@ -210,6 +243,17 @@ const ProduccionScreen = () => {
                                 />
                             </View>
                         </View>
+
+                        <Text style={styles.label}>Observación (Opcional)</Text>
+                        <TextInput
+                            style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
+                            placeholder="Ingrese detalles adicionales..."
+                            placeholderTextColor={colors.textSecondary}
+                            multiline
+                            numberOfLines={3}
+                            value={newBlock.observacion}
+                            onChangeText={t => setNewBlock({ ...newBlock, observacion: t })}
+                        />
 
                         <TouchableOpacity style={styles.saveBtn} onPress={handleCreateBlock}>
                             <Text style={styles.saveBtnText}>GUARDAR BLOQUE</Text>

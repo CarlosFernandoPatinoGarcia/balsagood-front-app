@@ -86,7 +86,7 @@ const AgrupacionScreen = () => {
                 onPress={() => toggleSelection(item.idBloque)}
             >
                 <View>
-                    <Text style={styles.itemText}>Bloque #{item.idBloque}</Text>
+                    <Text style={styles.itemText}>Bloque #{item.bloqueCodigo}</Text>
                     <Text style={styles.itemSub}>Largo: {item.bloqueLargo}" | {item.estado}</Text>
                 </View>
                 {isSelected && <Text style={styles.check}>✓</Text>}
