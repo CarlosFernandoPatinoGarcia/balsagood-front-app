@@ -22,6 +22,9 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.carlosfpg8.balsagoodfrontapp",
+      "permissions": [
+        "INTERNET"
+      ],
       "usesCleartextTraffic": true
     },
     "web": {
