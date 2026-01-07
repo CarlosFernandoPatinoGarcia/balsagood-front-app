@@ -42,57 +42,6 @@ const ProduccionScreen = () => {
         }, [])
     );
 
-    const handleStartOrder = async () => {
-        Alert.alert(
-            'Confirmar Inicio',
-            '¿Desea iniciar una nueva orden de taller?',
-            [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                    text: 'Iniciar',
-                    onPress: async () => {
-                        try {
-                            setLoading(true);
-                            await api.post('/api/ordenes-taller/iniciar');
-                            fetchActiveOrder();
-                        } catch (e) {
-                            Alert.alert('Error', 'No se pudo iniciar la orden');
-                        } finally {
-                            setLoading(false);
-                        }
-                    }
-                }
-            ]
-        );
-    };
-
-    const handleFinishOrder = async () => {
-        if (!activeOrder) return;
-        Alert.alert(
-            'Finalizar Orden',
-            '¿Está seguro de finalizar la producción actual?',
-            [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                    text: 'Finalizar',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            setLoading(true);
-                            // Asumimos endpoint global o por ID
-                            await api.patch(`/api/ordenes-taller/finalizar`);
-                            fetchActiveOrder(); // Debería volver a null
-                        } catch (e) {
-                            Alert.alert('Error', 'No se pudo finalizar la orden');
-                        } finally {
-                            setLoading(false);
-                        }
-                    }
-                }
-            ]
-        );
-    };
-
     const handleCreateBlock = async () => {
         if (!newBlock.codigo || !newBlock.largo || !newBlock.pesoSin) {
             Alert.alert('Error', 'Complete todos los campos');
@@ -100,23 +49,14 @@ const ProduccionScreen = () => {
         }
 
         try {
-            // Obtener ID de la orden de forma segura (Backend devuelve idOrden)
-            const orderId = activeOrder.id || activeOrder.idOrdenTaller || activeOrder.idOrden;
-            if (!orderId) {
-                Alert.alert("Error", "No se identifica la orden activa (ID nulo)");
-                return;
-            }
-
             const payload = {
-                // Usamos idOrden ya que así viene en el GET, es lo más probable que espere el POST
-                ordenTaller: { idOrden: orderId },
                 bloqueCodigo: newBlock.codigo,
                 bloqueLargo: parseFloat(newBlock.largo),
                 bloqueAncho: 24,
                 bloqueAlto: 48,
                 bloquePesoSinCola: parseFloat(newBlock.pesoSin),
-                // Cálculo BFT: (ancho * alto * largo) / 144
-                bloqueBftFinal: (24 * 48 * parseFloat(newBlock.largo)) / 144,
+                // Cálculo del volumen (BFT): largo * 8
+                bloqueBftFinal: (parseFloat(newBlock.largo)) * 8,
                 bloqueEstado: 'PRESENTADO'
             };
 
@@ -199,45 +139,21 @@ const ProduccionScreen = () => {
         }
     };
 
-    // Renderizado condicional
-    if (loading && !activeOrder) {
-        return (
-            <View style={[styles.container, { justifyContent: 'center' }]}>
-                <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-        );
-    }
-
-    // VISTA: SIN ORDEN
-    if (!activeOrder) {
-        return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <Text style={styles.noOrderText}>No hay producción en curso</Text>
-                <TouchableOpacity style={styles.startBtn} onPress={handleStartOrder}>
-                    <Text style={styles.startBtnText}>INICIAR NUEVA ORDEN</Text>
-                </TouchableOpacity>
-            </View>
-        );
-    }
-
     // Filtrar bloques para Encolado
-    const bloquesEncolado = activeOrder.bloques ? activeOrder.bloques.filter(b => b.estado === 'PRESENTADO') : [];
+    const bloquesEncolado = activeOrder && activeOrder.bloques ? activeOrder.bloques.filter(b => b.estado === 'PRESENTADO') : [];
     // Bloques recientes (todos o invertidos)
-    const bloquesRecientes = activeOrder.bloques ? [...activeOrder.bloques].sort((a, b) => b.id - a.id) : [];
+    const bloquesRecientes = activeOrder && activeOrder.bloques ? [...activeOrder.bloques].sort((a, b) => b.id - a.id) : [];
 
     return (
         <View style={styles.container}>
-            {/* ENCABEZADO ORDEN */}
+            {/* ENCABEZADO ORDEN (Simple) */}
             <View style={styles.header}>
                 <View>
-                    <Text style={styles.headerTitle}>Orden de Taller #{activeOrder.id || activeOrder.idOrdenTaller || activeOrder.idOrden || '---'}</Text>
+                    <Text style={styles.headerTitle}>Producción del Día</Text>
                     <Text style={styles.headerSubtitle}>
-                        Inicio: {(activeOrder.fechaInicio || activeOrder.ordenFechaInicio) ? new Date(activeOrder.fechaInicio || activeOrder.ordenFechaInicio).toLocaleTimeString() : '---'}
+                        {new Date().toLocaleDateString()}
                     </Text>
                 </View>
-                <TouchableOpacity style={styles.finishBtn} onPress={handleFinishOrder}>
-                    <Text style={styles.finishBtnText}>FINALIZAR</Text>
-                </TouchableOpacity>
             </View>
 
             {/* TABS */}

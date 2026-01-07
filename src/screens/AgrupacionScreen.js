@@ -49,22 +49,19 @@ const AgrupacionScreen = () => {
     };
 
     const handleCrearCuerpo = async () => {
-        // Validación de Rango mayor o igual a 86
-        if (largoTotal <= 86) {
-            Alert.alert('Rango Inválido', `El largo acumulado (${largoTotal}") debe ser mayor o igual a 86".`);
+        // Validar que se seleccionen al menos 1 bloque
+        if (selectedIds.length === 0) {
+            Alert.alert('Atención', 'Seleccione al menos un bloque.');
             return;
         }
 
         try {
-            // Construcción del Payload para /api/cuerpos/agrupar
             // Construcción del Payload para /api/cuerpos/agrupar
             const payload = {
                 idsBloques: selectedIds,
                 // El modelo de dominio corregido espera largoFinal
                 largoFinal: largoTotal,
                 observacion: `Generado desde App. Largo Total: ${largoTotal}"`,
-                // [MODULAR] Agrega aquí más campos si son necesarios en el futuro
-                // ejemploCampo: "Valor"
             };
             console.log("Payload:", payload);
             await api.post('/api/cuerpos/agrupar', payload);
@@ -72,7 +69,6 @@ const AgrupacionScreen = () => {
             Alert.alert('Éxito', 'Cuerpo creado y bloques asignados para exportación.');
 
             setSelectedIds([]);
-            // setAnchoTotal(0);
             setLargoTotal(0);
             fetchBloques(); // Recargar lista
         } catch (e) {
@@ -101,7 +97,7 @@ const AgrupacionScreen = () => {
     return (
         <View style={styles.container}>
             <Text style={styles.header}>Seleccione Bloques</Text>
-            <Text style={styles.subHeader}>Acumulado: {largoTotal.toFixed(2)}" (Meta: 86-88)</Text>
+            <Text style={styles.subHeader}>Acumulado: {largoTotal.toFixed(2)}"</Text>
 
             <FlatList
                 data={bloques}
@@ -113,8 +109,8 @@ const AgrupacionScreen = () => {
             <View style={styles.footer}>
                 <TouchableOpacity
                     onPress={handleCrearCuerpo}
-                    style={[styles.btn, (largoTotal <= 86) ? styles.btnDisabled : null]}
-                    disabled={largoTotal <= 86}
+                    style={[styles.btn, selectedIds.length === 0 && styles.btnDisabled]}
+                    disabled={selectedIds.length === 0}
                 >
                     <Text style={styles.btnText}>CONFIRMAR AGRUPACIÓN</Text>
                 </TouchableOpacity>

@@ -60,7 +60,7 @@ const IngresoPalletsScreen = () => {
         prov_nombre: '',
         id_proveedor: null, // Nuevo campo ID
         pallet_numero: '',
-        pallet_emplantillador: '',
+        pallet_emplantillador: 'Jefferson',
         ancho_global: '81', // Ancho Global Fijo
         calificaciones: [{ largo: '', espesor: '', cantidad: '', castigado: false, largo_original: '' }] // Lista dinámica inicializada con una fila
     });
@@ -141,11 +141,14 @@ const IngresoPalletsScreen = () => {
                 const l_original = item.castigado ? (parseFloat(item.largo_original) || 0) : l;
 
                 if (e > 0 && c > 0) {
+                    // Cálculo con redondeo a 4 decimales para igualar al backend
                     if (l > 0) {
-                        tempTotalAceptado += (l * ancho * e * c) / 12;
+                        const val = (l * ancho * e * c) / 12;
+                        tempTotalAceptado += parseFloat(val.toFixed(4));
                     }
                     if (l_original > 0) {
-                        tempTotalRecibido += (l_original * ancho * e * c) / 12;
+                        const valOrig = (l_original * ancho * e * c) / 12;
+                        tempTotalRecibido += parseFloat(valOrig.toFixed(4));
                     }
                 }
             });
@@ -429,14 +432,14 @@ const IngresoPalletsScreen = () => {
                                 onChangeText={(text) => handleChange('pallet_numero', text)}
                             />
                         </View>
-                        <View style={styles.col}>
+                        {/* <View style={styles.col}>
                             <Text style={styles.label}>Emplantillador</Text>
                             <TextInput
                                 style={styles.input}
                                 value={formData.pallet_emplantillador}
                                 onChangeText={(text) => handleChange('pallet_emplantillador', text)}
                             />
-                        </View>
+                        </View> */}
                     </View>
                 </View>
 
@@ -577,7 +580,7 @@ const IngresoPalletsScreen = () => {
                             <Text style={styles.label}>Total Recibido</Text>
                             <TextInput
                                 style={[styles.input, { backgroundColor: '#e0e0e0', color: colors.textPrimary, fontWeight: 'bold' }]}
-                                value={totalBFTRecibido.toFixed(2)}
+                                value={Math.round(totalBFTRecibido).toString()}
                                 editable={false}
                             />
                         </View>
@@ -585,7 +588,7 @@ const IngresoPalletsScreen = () => {
                             <Text style={styles.label}>Total Aceptado</Text>
                             <TextInput
                                 style={[styles.input, { backgroundColor: '#d1f2eb', color: '#0b5345', fontWeight: 'bold' }]}
-                                value={totalBFTAceptado.toFixed(2)}
+                                value={Math.round(totalBFTAceptado).toString()}
                                 editable={false}
                             />
                         </View>

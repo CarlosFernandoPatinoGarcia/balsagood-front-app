@@ -43,19 +43,19 @@ const DashboardScreen = ({ navigation }) => {
                 </View>
 
                 <MenuButton
-                    title="Ingreso de Pallets Verdes"
+                    title="🌲 Gestión Madera Verde"
                     onPress={() => navigation.navigate('IngresoPallets')}
                 />
                 <MenuButton
-                    title="Gestión de Secado"
+                    title="🌪️ Gestión de Secado"
                     onPress={() => navigation.navigate('GestionSecado')}
                 />
                 <MenuButton
-                    title="Producción y Encolado"
+                    title="⚙️ Gestión de Taller"
                     onPress={() => navigation.navigate('Produccion')}
                 />
                 <MenuButton
-                    title="Agrupación para Despacho"
+                    title="📦 Desembarque"
                     onPress={() => navigation.navigate('Agrupacion')}
                 />
             </ScrollView>
