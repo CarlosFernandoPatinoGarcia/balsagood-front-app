@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, Alert, StyleSheet, TextInput } from 'react-native';
 import api from '../api/api';
 import { colors } from '../theme/colors';
 
 const AgrupacionScreen = () => {
     const [bloques, setBloques] = useState([]);
+    const [searchQuery, setSearchQuery] = useState('');
     const [selectedIds, setSelectedIds] = useState([]);
     // const [anchoTotal, setAnchoTotal] = useState(0);
     const [largoTotal, setLargoTotal] = useState(0);
@@ -94,13 +95,26 @@ const AgrupacionScreen = () => {
         );
     };
 
+    const filteredBloques = bloques.filter(b =>
+        b.bloqueCodigo.toString().includes(searchQuery)
+    );
+
     return (
         <View style={styles.container}>
             <Text style={styles.header}>Seleccione Bloques</Text>
             <Text style={styles.subHeader}>Acumulado: {largoTotal.toFixed(2)}"</Text>
 
+            <TextInput
+                style={styles.searchInput}
+                placeholder="Buscar por código..."
+                placeholderTextColor="#999"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                keyboardType="numeric"
+            />
+
             <FlatList
-                data={bloques}
+                data={filteredBloques}
                 keyExtractor={item => item.idBloque.toString()}
                 renderItem={renderItem}
                 contentContainerStyle={{ paddingBottom: 100 }}
@@ -123,6 +137,15 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background, padding: 20 },
     header: { color: colors.white, fontSize: 20, fontWeight: 'bold' },
     subHeader: { color: colors.primary, fontSize: 16, marginBottom: 15 },
+    searchInput: {
+        backgroundColor: colors.card,
+        color: colors.white,
+        padding: 10,
+        borderRadius: 8,
+        marginBottom: 15,
+        borderWidth: 1,
+        borderColor: '#555'
+    },
     item: { backgroundColor: colors.card, padding: 15, borderRadius: 8, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     itemSelected: { borderColor: colors.primary, borderWidth: 1 },
     itemText: { color: colors.white, fontWeight: 'bold' },

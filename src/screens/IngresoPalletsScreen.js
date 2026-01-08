@@ -53,6 +53,38 @@ const DatePickerModal = ({ visible, onClose, onSelect, initialDate, title }) => 
     );
 };
 
+const SelectionModal = ({ visible, onClose, onSelect, options, title }) => {
+    return (
+        <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+            <View style={styles.modalOverlay}>
+                <View style={styles.modalContentSmall}>
+                    <Text style={styles.modalTitle}>{title}</Text>
+                    <FlatList
+                        data={options}
+                        keyExtractor={(item) => item.toString()}
+                        renderItem={({ item }) => (
+                            <TouchableOpacity
+                                style={styles.modalItem}
+                                onPress={() => onSelect(item)}
+                            >
+                                <Text style={styles.modalItemText}>{item}</Text>
+                            </TouchableOpacity>
+                        )}
+                        style={{ maxHeight: 300 }}
+                    />
+                    <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+                        <Text style={styles.closeBtnText}>Cancelar</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        </Modal>
+    );
+};
+
+const ANCHO_OPTIONS = ['74', '81'];
+const LARGO_OPTIONS = ['4', '3.5', '3', '2.5', '2'];
+const ESPESOR_OPTIONS = ['3', '2.5', '2', '1.5', '1', '0.875'];
+
 const IngresoPalletsScreen = () => {
     const [formData, setFormData] = useState({
         num_viaje: '',
@@ -70,6 +102,12 @@ const IngresoPalletsScreen = () => {
     const [newProviderModalVisible, setNewProviderModalVisible] = useState(false);
     const [newProviderName, setNewProviderName] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+
+    // Selection Modal state
+    const [selectionModalVisible, setSelectionModalVisible] = useState(false);
+    const [selectionOptions, setSelectionOptions] = useState([]);
+    const [selectionTitle, setSelectionTitle] = useState('');
+    const [selectionTarget, setSelectionTarget] = useState(null); // { type: 'global' | 'row', field: string, index?: number }
 
     // Date Picker state
     // const [date, setDate] = useState(new Date()); // No longer needed
@@ -112,11 +150,9 @@ const IngresoPalletsScreen = () => {
         if (formData.calificaciones.length > prevCalificacionesLength.current) {
             const index = formData.calificaciones.length - 1;
             // Pequeño timeout para asegurar que el componente se renderizó
-            setTimeout(() => {
-                if (itemsRef.current[`largo-${index}`]) {
-                    itemsRef.current[`largo-${index}`].focus();
-                }
-            }, 100);
+            // Ya no enfocamos largo automáticamente porque es un dropdown, quizás enfocar cantidad o nada?
+            // Dejamos el foco comentado o lo movemos a cantidad si se desea flujo rápido, 
+            // pero como ahora son selects, el flujo de teclado se rompe un poco.
         }
         prevCalificacionesLength.current = formData.calificaciones.length;
     }, [formData.calificaciones.length]);
@@ -195,11 +231,44 @@ const IngresoPalletsScreen = () => {
     };
 
     const removeRow = (index) => {
-        // Evitar borrar la última fila si se desea, pero el usuario puede querer vaciarlo. 
-        // El prompt dice "botón al presionarlo aparece nueva fila".
-        // Asumiremos que se puede borrar.
         const newCalificaciones = formData.calificaciones.filter((_, i) => i !== index);
         setFormData(prev => ({ ...prev, calificaciones: newCalificaciones }));
+    };
+
+    const handleOpenSelection = (type, field, index = null, currentVal = '') => {
+        let options = [];
+        let title = '';
+
+        if (field === 'ancho_global') {
+            options = ANCHO_OPTIONS;
+            title = 'Seleccionar Ancho';
+        } else if (field === 'largo') {
+            options = LARGO_OPTIONS;
+            title = 'Seleccionar Largo';
+        } else if (field === 'espesor') {
+            options = ESPESOR_OPTIONS;
+            title = 'Seleccionar Espesor';
+        }
+
+        setSelectionOptions(options);
+        setSelectionTitle(title);
+        setSelectionTarget({ type, field, index });
+        setSelectionModalVisible(true);
+    };
+
+    const handleSelectOption = (value) => {
+        if (!selectionTarget) return;
+
+        const { type, field, index } = selectionTarget;
+
+        if (type === 'global') {
+            handleChange(field, value);
+        } else if (type === 'row') {
+            updateRow(index, field, value);
+        }
+
+        setSelectionModalVisible(false);
+        setSelectionTarget(null);
     };
 
     const handleSubmit = async () => {
@@ -214,19 +283,11 @@ const IngresoPalletsScreen = () => {
                 id_proveedor: formData.id_proveedor, // Enviar ID si existe
                 pallet_numero: parseInt(formData.pallet_numero),
                 pallet_emplantillador: formData.pallet_emplantillador || "",
-                // El backend espera 'dimensiones' global? 
-                // El prompt dice: "Envía el arreglo de todas las filas capturadas en el objeto JSON de calificaciones."
-                // Probablemente el backend aun espere la estructura base. 
-                // Asumiremos que enviamos 'dimensiones' con el ancho global y quizas valores dummy o sumas para largo/espesor si fuera necesario,
-                // PERO el usuario especificó que las dimensiones son por fila.
-                // Ajustaremos para enviar el ancho en 'dimensiones' si es requerido por compatibilidad, 
-                // o si el backend fue modificado para ignorar las dimensiones globales viejas.
-                // Por seguridad, enviaremos ancho_plantilla en dimensiones, y el resto en calificaciones.
                 dimensiones: {
-                    largo: 0, // Ya no hay largo global único
+                    largo: 0,
                     ancho_plantilla: parseFloat(formData.ancho_global),
-                    espesor: 0, // Ya no hay espesor global único
-                    cantidad_plantilla: 0 // Ya no hay cantidad global única
+                    espesor: 0,
+                    cantidad_plantilla: 0
                 },
                 calificaciones: formData.calificaciones.map(c => {
                     const l = parseFloat(c.largo);
@@ -432,14 +493,6 @@ const IngresoPalletsScreen = () => {
                                 onChangeText={(text) => handleChange('pallet_numero', text)}
                             />
                         </View>
-                        {/* <View style={styles.col}>
-                            <Text style={styles.label}>Emplantillador</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={formData.pallet_emplantillador}
-                                onChangeText={(text) => handleChange('pallet_emplantillador', text)}
-                            />
-                        </View> */}
                     </View>
                 </View>
 
@@ -449,11 +502,12 @@ const IngresoPalletsScreen = () => {
                     <View style={styles.row}>
                         <View style={styles.col}>
                             <Text style={styles.label}>Ancho (Fijo)</Text>
-                            <TextInput
-                                style={[styles.input, { backgroundColor: '#e0e0e0', color: colors.textPrimary }]}
-                                value={formData.ancho_global}
-                                editable={false} // Fijo en 81
-                            />
+                            <TouchableOpacity
+                                style={[styles.input, { justifyContent: 'center' }]}
+                                onPress={() => handleOpenSelection('global', 'ancho_global')}
+                            >
+                                <Text style={{ color: colors.white }}>{formData.ancho_global}</Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
                 </View>
@@ -491,54 +545,31 @@ const IngresoPalletsScreen = () => {
                                             placeholderTextColor={colors.textSecondary}
                                             value={item.largo_original}
                                             onChangeText={(text) => updateRow(index, 'largo_original', text)}
-                                            returnKeyType="next"
-                                            blurOnSubmit={false}
-                                            onSubmitEditing={() => {
-                                                if (itemsRef.current[`largo-${index}`]) {
-                                                    itemsRef.current[`largo-${index}`].focus();
-                                                }
-                                            }}
                                         />
                                     </View>
                                 )}
 
                                 <View style={styles.col}>
                                     <Text style={styles.label}>{item.castigado ? "L. Acept." : "Largo"}</Text>
-                                    <TextInput
-                                        ref={(el) => itemsRef.current[`largo-${index}`] = el}
-                                        style={styles.input}
-                                        keyboardType="numeric"
-                                        placeholder="0.0"
-                                        placeholderTextColor={colors.textSecondary}
-                                        value={item.largo}
-                                        onChangeText={(text) => updateRow(index, 'largo', text)}
-                                        returnKeyType="next"
-                                        blurOnSubmit={false}
-                                        onSubmitEditing={() => {
-                                            if (itemsRef.current[`espesor-${index}`]) {
-                                                itemsRef.current[`espesor-${index}`].focus();
-                                            }
-                                        }}
-                                    />
+                                    <TouchableOpacity
+                                        style={[styles.input, { justifyContent: 'center' }]}
+                                        onPress={() => handleOpenSelection('row', 'largo', index)}
+                                    >
+                                        <Text style={{ color: item.largo ? colors.white : colors.textSecondary }}>
+                                            {item.largo || "0.0"}
+                                        </Text>
+                                    </TouchableOpacity>
                                 </View>
                                 <View style={styles.col}>
                                     <Text style={styles.label}>Espesor</Text>
-                                    <TextInput
-                                        ref={(el) => itemsRef.current[`espesor-${index}`] = el}
-                                        style={styles.input}
-                                        keyboardType="numeric"
-                                        placeholder="0.0"
-                                        placeholderTextColor={colors.textSecondary}
-                                        value={item.espesor}
-                                        onChangeText={(text) => updateRow(index, 'espesor', text)}
-                                        returnKeyType="next"
-                                        blurOnSubmit={false}
-                                        onSubmitEditing={() => {
-                                            if (itemsRef.current[`cantidad-${index}`]) {
-                                                itemsRef.current[`cantidad-${index}`].focus();
-                                            }
-                                        }}
-                                    />
+                                    <TouchableOpacity
+                                        style={[styles.input, { justifyContent: 'center' }]}
+                                        onPress={() => handleOpenSelection('row', 'espesor', index)}
+                                    >
+                                        <Text style={{ color: item.espesor ? colors.white : colors.textSecondary }}>
+                                            {item.espesor || "0.0"}
+                                        </Text>
+                                    </TouchableOpacity>
                                 </View>
                                 <View style={styles.col}>
                                     <Text style={styles.label}>Cant.</Text>
@@ -571,6 +602,15 @@ const IngresoPalletsScreen = () => {
                         </TouchableOpacity>
                     </View>
                 </View>
+
+                {/* Selection Modal */}
+                <SelectionModal
+                    visible={selectionModalVisible}
+                    onClose={() => setSelectionModalVisible(false)}
+                    options={selectionOptions}
+                    title={selectionTitle}
+                    onSelect={handleSelectOption}
+                />
 
                 {/* Cálculo Visual Total */}
                 <View style={styles.section}>
