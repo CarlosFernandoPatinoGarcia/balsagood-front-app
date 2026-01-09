@@ -4,6 +4,36 @@ import { useFocusEffect } from '@react-navigation/native';
 import api from '../api/api';
 import { colors } from '../theme/colors';
 
+const SelectionModal = ({ visible, onClose, onSelect, options, title }) => {
+    return (
+        <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+            <View style={styles.modalOverlay}>
+                <View style={styles.modalContentSmall}>
+                    <Text style={styles.modalTitle}>{title}</Text>
+                    <FlatList
+                        data={options}
+                        keyExtractor={(item) => item.toString()}
+                        renderItem={({ item }) => (
+                            <TouchableOpacity
+                                style={styles.modalItem}
+                                onPress={() => onSelect(item)}
+                            >
+                                <Text style={styles.modalItemText}>{item}</Text>
+                            </TouchableOpacity>
+                        )}
+                        style={{ maxHeight: 300 }}
+                    />
+                    <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+                        <Text style={styles.closeBtnText}>Cancelar</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        </Modal>
+    );
+};
+
+const LARGO_OPTIONS = ['25', '24', '23', '22', '21', '20', '18', '16', '14', '12', '10', '8', '6'];
+
 const ProduccionScreen = () => {
     const [activeOrder, setActiveOrder] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -17,6 +47,9 @@ const ProduccionScreen = () => {
     const [glueModalVisible, setGlueModalVisible] = useState(false);
     const [selectedBlock, setSelectedBlock] = useState(null); // Bloque seleccionado para encolar
     const [glueWeight, setGlueWeight] = useState('');
+
+    // Estado Selección Largo
+    const [lengthModalVisible, setLengthModalVisible] = useState(false);
 
     const fetchActiveOrder = async () => {
         setLoading(true);
@@ -232,14 +265,14 @@ const ProduccionScreen = () => {
                         <View style={styles.row}>
                             <View style={[styles.col, { marginRight: 10 }]}>
                                 <Text style={styles.label}>Largo</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Ej. 10"
-                                    placeholderTextColor={colors.textSecondary}
-                                    keyboardType="numeric"
-                                    value={newBlock.largo}
-                                    onChangeText={t => setNewBlock({ ...newBlock, largo: t })}
-                                />
+                                <TouchableOpacity
+                                    style={[styles.input, { justifyContent: 'center' }]}
+                                    onPress={() => setLengthModalVisible(true)}
+                                >
+                                    <Text style={{ color: newBlock.largo ? colors.white : colors.textSecondary }}>
+                                        {newBlock.largo || "Seleccionar"}
+                                    </Text>
+                                </TouchableOpacity>
                             </View>
                             <View style={styles.col}>
                                 <Text style={styles.label}>Peso Sin Cola</Text>
@@ -334,7 +367,6 @@ const ProduccionScreen = () => {
                 </View>
             )}
 
-            {/* MODAL ENCOLADO */}
             <Modal visible={glueModalVisible} transparent animationType="slide">
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
@@ -364,6 +396,17 @@ const ProduccionScreen = () => {
                     </View>
                 </View>
             </Modal>
+
+            <SelectionModal
+                visible={lengthModalVisible}
+                onClose={() => setLengthModalVisible(false)}
+                options={LARGO_OPTIONS}
+                title="Seleccionar Largo"
+                onSelect={(val) => {
+                    setNewBlock({ ...newBlock, largo: val });
+                    setLengthModalVisible(false);
+                }}
+            />
         </View>
     );
 };
@@ -422,7 +465,14 @@ const styles = StyleSheet.create({
     modalTitle: { color: colors.primary, fontSize: 20, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' },
     modalSub: { color: colors.white, marginBottom: 20, textAlign: 'center' },
     cancelBtn: { marginTop: 10, padding: 15, alignItems: 'center' },
-    cancelBtnText: { color: colors.textSecondary }
+    cancelBtnText: { color: colors.textSecondary },
+
+    // Selection Modal Styles
+    modalContentSmall: { width: '80%', backgroundColor: colors.background, borderRadius: 15, padding: 20, borderWidth: 1, borderColor: colors.border },
+    modalItem: { padding: 15, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
+    modalItemText: { color: colors.white, fontSize: 16 },
+    closeBtn: { marginTop: 15, padding: 10, alignItems: 'center', backgroundColor: colors.card, borderRadius: 8 },
+    closeBtnText: { color: colors.textSecondary },
 });
 
 export default ProduccionScreen;
