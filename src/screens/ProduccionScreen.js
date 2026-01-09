@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ScrollView,
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../api/api';
 import { colors } from '../theme/colors';
+import { generarReportePDF } from '../utils/pdfGenerator';
 
 const SelectionModal = ({ visible, onClose, onSelect, options, title }) => {
     return (
@@ -63,12 +64,12 @@ const ProduccionScreen = () => {
             // Si retorna 204 o vacío, significa que no hay orden activa.
             // La creamos automáticamente "por debajo".
             if (response.status === 204 || !response.data) {
-                console.log("No hay orden activa, auto-generando orden diaria...");
+                // console.log("No hay orden activa, auto-generando orden diaria...");
                 try {
                     await api.post('/api/ordenes-taller/iniciar');
                     // Volvemos a consultar para obtener la orden recién creada
                     response = await api.get('/api/ordenes-taller/activa');
-                    console.log("Orden auto-generada con éxito.");
+                    // console.log("Orden auto-generada con éxito.");
                 } catch (createErr) {
                     console.error("Error al auto-generar orden:", createErr);
                     // Si falla la creación, no podemos hacer mucho más que avisar,
@@ -77,7 +78,7 @@ const ProduccionScreen = () => {
             }
 
             if (response.data) {
-                console.log("Orden Activa cargada:", response.data);
+                // console.log("Orden Activa cargada:", response.data);
                 setActiveOrder(response.data);
             }
         } catch (error) {
@@ -124,7 +125,7 @@ const ProduccionScreen = () => {
             };
 
 
-            console.log(payload);
+            // console.log(payload);
             await api.post('/api/bloques', payload);
             Alert.alert('Éxito', 'Bloque registrado');
             setNewBlock({ codigo: '', largo: '', pesoSin: '', observacion: '', tipoMadera: { idTipoMadera: null } });
@@ -178,10 +179,10 @@ const ProduccionScreen = () => {
             }
 
             // 6. DEBUG: Ver qué estamos enviando realmente (Míralo en tu terminal)
-            console.log("Enviando a Backend:", {
-                url: `/api/bloques/${blockId}/encolado`,
-                payload: { bloquePesoConCola: pesoCon }
-            });
+            // console.log("Enviando a Backend:", {
+            //     url: `/api/bloques/${blockId}/encolado`,
+            //     payload: { bloquePesoConCola: pesoCon }
+            // });
 
             // 7. Llamada a la API
             await api.put(`/api/bloques/${blockId}/encolado`, {
@@ -200,6 +201,15 @@ const ProduccionScreen = () => {
             const msg = e.response?.data?.message || e.response?.data || "Error de conexión o validación";
             Alert.alert('Error al guardar', `Servidor respondió: ${e.response?.status} - ${msg}`);
         }
+    };
+
+    const handleExportarPDF = () => {
+        if (!activeOrder || !activeOrder.bloques) {
+            Alert.alert("Atención", "No hay datos para exportar");
+            return;
+        }
+        // Llamamos a la función
+        generarReportePDF(activeOrder, activeOrder.bloques);
     };
 
     // Renderizado condicional
@@ -225,7 +235,12 @@ const ProduccionScreen = () => {
                     <Text style={styles.headerSubtitle}>
                         {new Date().toLocaleDateString()}
                     </Text>
+
+                    <TouchableOpacity onPress={handleExportarPDF} style={{ backgroundColor: '#e74c3c', padding: 8, borderRadius: 5 }}>
+                        <Text style={{ color: 'white', fontWeight: 'bold' }}>PDF</Text>
+                    </TouchableOpacity>
                 </View>
+
             </View>
 
             {/* TABS */}

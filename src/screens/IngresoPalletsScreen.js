@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Switch, Modal, FlatList } from 'react-native';
 import api from '../api/api';
 import { colors } from '../theme/colors';
+import { generarReporteInventario } from '../utils/pdfGenerator';
 
 const DatePickerModal = ({ visible, onClose, onSelect, initialDate, title }) => {
     const [year, setYear] = useState(initialDate ? initialDate.split('-')[0] : new Date().getFullYear().toString());
@@ -339,10 +340,31 @@ const IngresoPalletsScreen = () => {
         }
     };
 
+    const handleExportarInventario = async () => {
+        try {
+            // New Endpoint: Backend already aggregated data
+            const response = await api.get('/api/inventario/pallets');
+            const data = response.data || [];
+
+            // Pass the flat list directly to the report generator
+            await generarReporteInventario(data);
+
+        } catch (error) {
+            console.error("Error fetching data for report:", error);
+            Alert.alert("Error", "No se pudieron cargar los datos para el reporte.");
+        }
+    };
+
     return (
         <View style={{ flex: 1 }}>
+
             <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.container}>
-                <Text style={styles.headerTitle}>Ingreso de Pallets</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                    <Text style={[styles.headerTitle, { marginBottom: 0 }]}>Ingreso de Pallets</Text>
+                    <TouchableOpacity onPress={handleExportarInventario} style={{ backgroundColor: '#e74c3c', padding: 8, borderRadius: 5 }}>
+                        <Text style={{ color: 'white', fontWeight: 'bold' }}>PDF INV.</Text>
+                    </TouchableOpacity>
+                </View>
 
                 {/* 1. Datos de Recepción */}
                 <View style={styles.section}>
