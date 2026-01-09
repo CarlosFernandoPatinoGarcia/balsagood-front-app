@@ -8,9 +8,10 @@ const ProduccionScreen = () => {
     const [activeOrder, setActiveOrder] = useState(null);
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('NUEVO'); // 'NUEVO' | 'ENCOLADO'
+    const [tiposMadera, setTiposMadera] = useState([]);
 
     // Formulario Nuevo Bloque
-    const [newBlock, setNewBlock] = useState({ codigo: '', largo: '', pesoSin: '', observacion: '' });
+    const [newBlock, setNewBlock] = useState({ codigo: '', largo: '', pesoSin: '', observacion: '', tipoMaderaId: null });
 
     // Estado Encolado (Modal)
     const [glueModalVisible, setGlueModalVisible] = useState(false);
@@ -20,6 +21,10 @@ const ProduccionScreen = () => {
     const fetchActiveOrder = async () => {
         setLoading(true);
         try {
+            // Cargar tipos madera en paralelo
+            const resMadera = await api.get('/api/tipos-madera');
+            setTiposMadera(resMadera.data || []);
+
             let response = await api.get('/api/ordenes-taller/activa');
 
             // Si retorna 204 o vacío, significa que no hay orden activa.
@@ -56,8 +61,8 @@ const ProduccionScreen = () => {
     );
 
     const handleCreateBlock = async () => {
-        if (!newBlock.codigo || !newBlock.largo || !newBlock.pesoSin) {
-            Alert.alert('Error', 'Complete todos los campos obligatorios');
+        if (!newBlock.codigo || !newBlock.largo || !newBlock.pesoSin || !newBlock.tipoMaderaId) {
+            Alert.alert('Error', 'Complete todos los campos obligatorios (incluyendo Tipo Madera)');
             return;
         }
 
@@ -81,14 +86,15 @@ const ProduccionScreen = () => {
                 // Cálculo del volumen (BFT): largo * 8
                 bloqueBftFinal: (parseFloat(newBlock.largo)) * 8,
                 bloqueEstado: 'PRESENTADO',
-                bloqueObservacion: newBlock.observacion // Campo de observación
+                bloqueObservacion: newBlock.observacion, // Campo de observación
+                tipoMadera: { idTipoMadera: newBlock.tipoMaderaId }
             };
 
 
             console.log(payload);
             await api.post('/api/bloques', payload);
             Alert.alert('Éxito', 'Bloque registrado');
-            setNewBlock({ codigo: '', largo: '', pesoSin: '', observacion: '' });
+            setNewBlock({ codigo: '', largo: '', pesoSin: '', observacion: '', tipoMadera: { idTipoMadera: null } });
             fetchActiveOrder(); // Recargar lista de bloques
         } catch (e) {
             console.error(e);
@@ -228,6 +234,8 @@ const ProduccionScreen = () => {
                                 <Text style={styles.label}>Largo</Text>
                                 <TextInput
                                     style={styles.input}
+                                    placeholder="Ej. 10"
+                                    placeholderTextColor={colors.textSecondary}
                                     keyboardType="numeric"
                                     value={newBlock.largo}
                                     onChangeText={t => setNewBlock({ ...newBlock, largo: t })}
@@ -237,6 +245,8 @@ const ProduccionScreen = () => {
                                 <Text style={styles.label}>Peso Sin Cola</Text>
                                 <TextInput
                                     style={styles.input}
+                                    placeholder="Ej. 31.2"
+                                    placeholderTextColor={colors.textSecondary}
                                     keyboardType="numeric"
                                     value={newBlock.pesoSin}
                                     onChangeText={t => setNewBlock({ ...newBlock, pesoSin: t })}
@@ -247,13 +257,42 @@ const ProduccionScreen = () => {
                         <Text style={styles.label}>Observación (Opcional)</Text>
                         <TextInput
                             style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
-                            placeholder="Ingrese detalles adicionales..."
+                            placeholder="Detalles adicionales..."
                             placeholderTextColor={colors.textSecondary}
                             multiline
                             numberOfLines={3}
                             value={newBlock.observacion}
                             onChangeText={t => setNewBlock({ ...newBlock, observacion: t })}
                         />
+
+                        <Text style={styles.label}>Tipo de Madera *</Text>
+                        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
+                            {tiposMadera.map((tipo) => {
+                                const label = tipo.tipoDescripcion === 'L' ? 'Liviana' :
+                                    tipo.tipoDescripcion === 'P' ? 'Pesada' :
+                                        tipo.tipoDescripcion;
+                                const isSelected = newBlock.tipoMaderaId === tipo.idTipoMadera;
+
+                                return (
+                                    <TouchableOpacity
+                                        key={tipo.idTipoMadera}
+                                        style={[
+                                            styles.input,
+                                            { flex: 1, alignItems: 'center', marginBottom: 0, justifyContent: 'center' },
+                                            isSelected && { backgroundColor: colors.primary, borderColor: colors.primary }
+                                        ]}
+                                        onPress={() => setNewBlock({ ...newBlock, tipoMaderaId: tipo.idTipoMadera })}
+                                    >
+                                        <Text style={{
+                                            color: isSelected ? colors.background : colors.textSecondary,
+                                            fontWeight: isSelected ? 'bold' : 'normal'
+                                        }}>
+                                            {label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
 
                         <TouchableOpacity style={styles.saveBtn} onPress={handleCreateBlock}>
                             <Text style={styles.saveBtnText}>GUARDAR BLOQUE</Text>

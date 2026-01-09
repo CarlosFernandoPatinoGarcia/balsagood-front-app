@@ -91,6 +91,7 @@ const IngresoPalletsScreen = () => {
         fecha_ingreso: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD local format
         prov_nombre: '',
         id_proveedor: null, // Nuevo campo ID
+        id_tipo_madera: null, // Tipo de Madera
         pallet_numero: '',
         pallet_emplantillador: 'Jefferson',
         ancho_global: '81', // Ancho Global Fijo
@@ -123,6 +124,8 @@ const IngresoPalletsScreen = () => {
     // Estado para trackear adición de filas
     const prevCalificacionesLength = React.useRef(formData.calificaciones.length);
 
+    const [tiposMadera, setTiposMadera] = useState([]);
+
     // Cargar proveedores con búsqueda
     const fetchProveedores = async (query = '') => {
         try {
@@ -136,6 +139,19 @@ const IngresoPalletsScreen = () => {
             // No alertar en cada tipeo fallido para no interrumpir
         }
     };
+
+    const fetchTiposMadera = async () => {
+        try {
+            const response = await api.get('/api/tipos-madera');
+            setTiposMadera(response.data || []);
+        } catch (error) {
+            console.error("Error fetching tipos madera:", error);
+        }
+    };
+
+    useEffect(() => {
+        fetchTiposMadera();
+    }, []);
 
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
@@ -193,7 +209,7 @@ const IngresoPalletsScreen = () => {
 
             // 2. Validación
             // Campos de cabecera
-            if (!num_viaje || !prov_nombre || !pallet_numero || !ancho_global) return false;
+            if (!num_viaje || !prov_nombre || !pallet_numero || !ancho_global || !formData.id_tipo_madera) return false;
 
             // Validar filas dinámica
             // Cada fila debe tener datos válidos si hay filas
@@ -281,6 +297,7 @@ const IngresoPalletsScreen = () => {
                 fecha_ingreso: formData.fecha_ingreso,
                 prov_nombre: formData.prov_nombre,
                 id_proveedor: formData.id_proveedor, // Enviar ID si existe
+                id_tipo_madera: formData.id_tipo_madera,
                 pallet_numero: parseInt(formData.pallet_numero),
                 pallet_emplantillador: formData.pallet_emplantillador || "",
                 dimensiones: {
@@ -335,6 +352,8 @@ const IngresoPalletsScreen = () => {
                     <TextInput
                         style={styles.input}
                         keyboardType="numeric"
+                        placeholder="Ej. 123"
+                        placeholderTextColor={colors.textSecondary}
                         value={formData.num_viaje}
                         onChangeText={(text) => handleChange('num_viaje', text)}
                     />
@@ -483,12 +502,43 @@ const IngresoPalletsScreen = () => {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>2. Datos del Pallet</Text>
 
+                    <Text style={styles.label}>Tipo de Madera *</Text>
+                    <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>
+                        {tiposMadera.map((tipo) => {
+                            const label = tipo.tipoDescripcion === 'L' ? 'Liviana' :
+                                tipo.tipoDescripcion === 'P' ? 'Pesada' :
+                                    tipo.tipoDescripcion;
+                            const isSelected = formData.id_tipo_madera === tipo.idTipoMadera;
+
+                            return (
+                                <TouchableOpacity
+                                    key={tipo.idTipoMadera}
+                                    style={[
+                                        styles.input,
+                                        { flex: 1, alignItems: 'center', marginBottom: 0, justifyContent: 'center' },
+                                        isSelected && { backgroundColor: colors.primary, borderColor: colors.primary }
+                                    ]}
+                                    onPress={() => handleChange('id_tipo_madera', tipo.idTipoMadera)}
+                                >
+                                    <Text style={{
+                                        color: isSelected ? colors.background : colors.textSecondary,
+                                        fontWeight: isSelected ? 'bold' : 'normal'
+                                    }}>
+                                        {label}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+
                     <View style={styles.row}>
                         <View style={styles.col}>
                             <Text style={styles.label}>Número Pallet *</Text>
                             <TextInput
                                 style={styles.input}
                                 keyboardType="numeric"
+                                placeholder="Ej. 1, 2, ..."
+                                placeholderTextColor={colors.textSecondary}
                                 value={formData.pallet_numero}
                                 onChangeText={(text) => handleChange('pallet_numero', text)}
                             />

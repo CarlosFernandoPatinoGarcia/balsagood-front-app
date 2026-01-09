@@ -126,7 +126,7 @@ const AgrupacionScreen = () => {
                     style={[styles.btn, selectedIds.length === 0 && styles.btnDisabled]}
                     disabled={selectedIds.length === 0}
                 >
-                    <Text style={styles.btnText}>CONFIRMAR AGRUPACIÓN</Text>
+                    <Text style={styles.btnText}>CONFIRMAR EXPORTACIÓN</Text>
                 </TouchableOpacity>
             </View>
         </View>

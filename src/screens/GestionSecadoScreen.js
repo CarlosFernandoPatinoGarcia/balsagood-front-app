@@ -83,6 +83,11 @@ const GestionSecadoScreen = ({ navigation }) => {
     const [camaras, setCamaras] = useState([]);
     const [lotes, setLotes] = useState([]);
 
+    // Search States
+    const [searchPendientes, setSearchPendientes] = useState('');
+    const [searchProceso, setSearchProceso] = useState('');
+    const [searchHistorial, setSearchHistorial] = useState('');
+
     const getLocalDate = () => {
         const now = new Date();
         const year = now.getFullYear();
@@ -240,155 +245,177 @@ const GestionSecadoScreen = ({ navigation }) => {
 
     // --- Renderers ---
 
-    const renderPendientes = () => (
-        <ScrollView style={styles.tabContent}>
-            <Text style={styles.sectionTitle}>Configuración de Lote</Text>
+    const renderPendientes = () => {
+        const filteredPallets = palletsDisponibles.filter(p =>
+            (p.recepcion?.numViaje || '').toString().toLowerCase().includes(searchPendientes.toLowerCase())
+        );
 
-            <View style={styles.card}>
-                <Text style={styles.label}>Cámara *</Text>
-                <TouchableOpacity style={styles.selector} onPress={() => setShowCameraModal(true)}>
-                    <Text style={[styles.selectorText, !formData.idCamara && styles.placeholderText]}>
-                        {formData.camaraDescripcion || 'Seleccionar Cámara...'}
-                    </Text>
-                </TouchableOpacity>
+        return (
+            <ScrollView style={styles.tabContent}>
+                <Text style={styles.sectionTitle}>Configuración de Lote</Text>
 
-                <Text style={[styles.label, { marginTop: 15 }]}>Código de Lote *</Text>
-                <TextInput
-                    style={styles.input}
-                    value={formData.loteCodigo}
-                    onChangeText={t => setFormData({ ...formData, loteCodigo: t })}
-                    placeholder="Ingrese código manual (Ej. 1500)"
-                    placeholderTextColor={colors.textSecondary}
-                    keyboardType="numeric"
-                />
-
-                <View style={styles.row}>
-                    <View style={styles.col}>
-                        <Text style={styles.label}>Inicio *</Text>
-                        <TouchableOpacity style={styles.selector} onPress={() => setShowStartPicker(true)}>
-                            <Text style={styles.selectorText}>
-                                {formData.loteFechaInicio.split('T')[0]}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.col}>
-                        <Text style={styles.label}>Fin Estimado *</Text>
-                        <TouchableOpacity style={styles.selector} onPress={() => setShowEndPicker(true)}>
-                            <Text style={[styles.selectorText, !formData.loteFechaFin && styles.placeholderText]}>
-                                {formData.loteFechaFin ? formData.loteFechaFin.split('T')[0] : 'Seleccionar'}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                <Text style={styles.label}>Observaciones</Text>
-                <TextInput
-                    style={styles.input}
-                    value={formData.loteObservaciones}
-                    onChangeText={t => setFormData({ ...formData, loteObservaciones: t })}
-                />
-            </View>
-
-            <Text style={styles.sectionTitle}>Seleccionar Pallets (Verdes)</Text>
-            <View style={styles.summaryContainer}>
-                <Text style={styles.summaryText}>Seleccionados: {selectedPallets.length}</Text>
-                <Text style={[
-                    styles.summaryText,
-                    isCapacityExceeded ? { color: colors.danger } : {}
-                ]}>
-                    Total BFT: {totalBFT.toFixed(2)}
-                    {formData.idCamara && ` / ${availableCapacity.toFixed(2)}`}
-                </Text>
-            </View>
-
-            {palletsDisponibles.map((p, index) => {
-                const id = p.idPallet || p.id;
-                const uniqueKey = id ? id.toString() : `fallback-${index}`;
-
-                return (
-                    <TouchableOpacity
-                        key={uniqueKey}
-                        style={[styles.palletItem, selectedPallets.includes(id) && styles.palletSelected]}
-                        onPress={() => togglePalletSelection(id)}
-                    >
-                        <Text style={styles.palletText}>
-                            {p.codigo ? `Código: ${p.codigo}` : `Pallet #${p.palletNumero || '?'}`}
-                            {p.recepcion?.proveedor?.provNombre ? ` - ${p.recepcion.proveedor.provNombre}` : ''}
-                        </Text>
-
-                        <Text style={styles.palletSub}>
-                            Viaje: {p.recepcion?.numViaje || '-'}
-                            {p.bftVerdeAceptado ? ` • BFT: ${p.bftVerdeAceptado}` : ''}
+                <View style={styles.card}>
+                    <Text style={styles.label}>Cámara *</Text>
+                    <TouchableOpacity style={styles.selector} onPress={() => setShowCameraModal(true)}>
+                        <Text style={[styles.selectorText, !formData.idCamara && styles.placeholderText]}>
+                            {formData.camaraDescripcion || 'Seleccionar Cámara...'}
                         </Text>
                     </TouchableOpacity>
-                );
-            })}
 
-            {palletsDisponibles.length === 0 && <Text style={styles.emptyText}>No hay pallets disponibles.</Text>}
+                    <Text style={[styles.label, { marginTop: 15 }]}>Código de Lote *</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={formData.loteCodigo}
+                        onChangeText={t => setFormData({ ...formData, loteCodigo: t })}
+                        placeholder="Ingrese código manual (Ej. 1500)"
+                        placeholderTextColor={colors.textSecondary}
+                        keyboardType="numeric"
+                    />
 
-            <TouchableOpacity
-                style={[styles.actionBtn, !isValid && styles.disabledBtn]}
-                onPress={handleCreateLote}
-                disabled={!isValid}
-                activeOpacity={isValid ? 0.7 : 1}
-            >
-                <Text style={styles.actionBtnText}>CREAR LOTE</Text>
-            </TouchableOpacity>
+                    <View style={styles.row}>
+                        <View style={styles.col}>
+                            <Text style={styles.label}>Inicio *</Text>
+                            <TouchableOpacity style={styles.selector} onPress={() => setShowStartPicker(true)}>
+                                <Text style={styles.selectorText}>
+                                    {formData.loteFechaInicio.split('T')[0]}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.col}>
+                            <Text style={styles.label}>Fin Estimado *</Text>
+                            <TouchableOpacity style={styles.selector} onPress={() => setShowEndPicker(true)}>
+                                <Text style={[styles.selectorText, !formData.loteFechaFin && styles.placeholderText]}>
+                                    {formData.loteFechaFin ? formData.loteFechaFin.split('T')[0] : 'Seleccionar'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
 
-            {!isValid && (
-                <View>
-                    <Text style={styles.validationText}>
-                        Complete cámara, fechas y seleccione al menos un pallet.
-                    </Text>
-                    {isCapacityExceeded && (
-                        <Text style={[styles.validationText, { color: colors.danger, fontWeight: 'bold' }]}>
-                            ¡La capacidad de la cámara es insuficiente!
-                            {'\n'}Requerido: {totalBFT.toFixed(2)} - Disponible: {availableCapacity.toFixed(2)}
-                        </Text>
-                    )}
+                    <Text style={styles.label}>Observaciones</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={formData.loteObservaciones}
+                        placeholder="Madera azulada; madera podrida; etc."
+                        placeholderTextColor={colors.textSecondary}
+                        onChangeText={t => setFormData({ ...formData, loteObservaciones: t })}
+                    />
                 </View>
-            )}
 
-            <View style={{ height: 50 }} />
+                <Text style={styles.sectionTitle}>Seleccionar Pallets (Verdes)</Text>
+                <View style={styles.summaryContainer}>
+                    <Text style={styles.summaryText}>Seleccionados: {selectedPallets.length}</Text>
+                    <Text style={[
+                        styles.summaryText,
+                        isCapacityExceeded ? { color: colors.danger } : {}
+                    ]}>
+                        Total BFT: {totalBFT.toFixed(2)}
+                        {formData.idCamara && ` / ${availableCapacity.toFixed(2)}`}
+                    </Text>
+                </View>
 
-            <CameraSelectorModal
-                visible={showCameraModal}
-                onClose={() => setShowCameraModal(false)}
-                cameras={camaras}
-                onSelect={(cam) => {
-                    const id = cam.idCamara || cam.id;
-                    setFormData({ ...formData, idCamara: id, camaraDescripcion: cam.camaraDescripcion || `Cámara ${id}` });
-                    setShowCameraModal(false);
-                }}
-            />
+                <TextInput
+                    style={styles.searchInput}
+                    placeholder="Buscar por numero de viaje..."
+                    placeholderTextColor="#999"
+                    value={searchPendientes}
+                    onChangeText={setSearchPendientes}
+                />
 
-            <DatePickerModal
-                visible={showStartPicker}
-                onClose={() => setShowStartPicker(false)}
-                initialDate={formData.loteFechaInicio.split('T')[0]}
-                title="Fecha Inicio"
-                onSelect={(date) => {
-                    setFormData({ ...formData, loteFechaInicio: date });
-                    setShowStartPicker(false);
-                }}
-            />
+                {filteredPallets.map((p, index) => {
+                    //filtrar por numero de viaje
+                    const id = p.idPallet || p.recepcion.numViaje;
+                    const uniqueKey = id ? id.toString() : `fallback-${index}`;
 
-            <DatePickerModal
-                visible={showEndPicker}
-                onClose={() => setShowEndPicker(false)}
-                initialDate={formData.loteFechaFin ? formData.loteFechaFin.split('T')[0] : ''}
-                title="Fecha Fin Estimada"
-                onSelect={(date) => {
-                    setFormData({ ...formData, loteFechaFin: date });
-                    setShowEndPicker(false);
-                }}
-            />
+                    return (
+                        <TouchableOpacity
+                            key={uniqueKey}
+                            style={[styles.palletItem, selectedPallets.includes(id) && styles.palletSelected]}
+                            onPress={() => togglePalletSelection(id)}
+                        >
+                            <Text style={styles.palletText}>
+                                {p.codigo ? `Código: ${p.codigo}` : `Pallet #${p.palletNumero || '?'}`}
+                                {p.recepcion?.proveedor?.provNombre ? ` - ${p.recepcion.proveedor.provNombre}` : ''}
+                            </Text>
 
-        </ScrollView>
-    );
+                            <Text style={styles.palletSub}>
+                                Viaje: {p.recepcion?.numViaje || '-'}
+                                {p.bftVerdeAceptado ? ` • BFT: ${p.bftVerdeAceptado}` : ''}
+                            </Text>
+                        </TouchableOpacity>
+                    );
+                })}
 
-    const renderLotesList = (dataLotes, isHistory) => {
-        const sortedLotes = [...dataLotes].sort((a, b) => {
+                {filteredPallets.length === 0 && <Text style={styles.emptyText}>No hay pallets disponibles.</Text>}
+
+                <TouchableOpacity
+                    style={[styles.actionBtn, !isValid && styles.disabledBtn]}
+                    onPress={handleCreateLote}
+                    disabled={!isValid}
+                    activeOpacity={isValid ? 0.7 : 1}
+                >
+                    <Text style={styles.actionBtnText}>CREAR LOTE</Text>
+                </TouchableOpacity>
+
+                {!isValid && (
+                    <View>
+                        <Text style={styles.validationText}>
+                            Complete cámara, fechas y seleccione al menos un pallet.
+                        </Text>
+                        {isCapacityExceeded && (
+                            <Text style={[styles.validationText, { color: colors.danger, fontWeight: 'bold' }]}>
+                                ¡La capacidad de la cámara es insuficiente!
+                                {'\n'}Requerido: {totalBFT.toFixed(2)} - Disponible: {availableCapacity.toFixed(2)}
+                            </Text>
+                        )}
+                    </View>
+                )}
+
+                <View style={{ height: 50 }} />
+
+                <CameraSelectorModal
+                    visible={showCameraModal}
+                    onClose={() => setShowCameraModal(false)}
+                    cameras={camaras}
+                    onSelect={(cam) => {
+                        const id = cam.idCamara || cam.id;
+                        setFormData({ ...formData, idCamara: id, camaraDescripcion: cam.camaraDescripcion || `Cámara ${id}` });
+                        setShowCameraModal(false);
+                    }}
+                />
+
+                <DatePickerModal
+                    visible={showStartPicker}
+                    onClose={() => setShowStartPicker(false)}
+                    initialDate={formData.loteFechaInicio.split('T')[0]}
+                    title="Fecha Inicio"
+                    onSelect={(date) => {
+                        setFormData({ ...formData, loteFechaInicio: date });
+                        setShowStartPicker(false);
+                    }}
+                />
+
+                <DatePickerModal
+                    visible={showEndPicker}
+                    onClose={() => setShowEndPicker(false)}
+                    initialDate={formData.loteFechaFin ? formData.loteFechaFin.split('T')[0] : ''}
+                    title="Fecha Fin Estimada"
+                    onSelect={(date) => {
+                        setFormData({ ...formData, loteFechaFin: date });
+                        setShowEndPicker(false);
+                    }}
+                />
+
+            </ScrollView>
+        );
+    };
+
+    const renderLotesList = (dataLotes, isHistory, searchQuery, setSearchQuery) => {
+        const filteredLotes = dataLotes.filter(l =>
+            (l.loteCodigo || '').toString().includes(searchQuery) ||
+            l.idLote.toString().includes(searchQuery)
+        );
+
+        const sortedLotes = [...filteredLotes].sort((a, b) => {
             // Prioridad: STOCK SECO (FINALIZADO) primero en Proceso
             if (!isHistory) {
                 const isAStock = a.estado === 'FINALIZADO';
@@ -401,6 +428,15 @@ const GestionSecadoScreen = ({ navigation }) => {
 
         return (
             <ScrollView style={styles.tabContent}>
+                <TextInput
+                    style={styles.searchInput}
+                    placeholder="Buscar lote por código..."
+                    placeholderTextColor="#999"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    keyboardType="numeric"
+                />
+
                 {sortedLotes.length === 0 && <Text style={styles.emptyText}>No hay lotes en esta categoría.</Text>}
                 {sortedLotes.map(lote => {
                     const isReady = lote.estado === 'LISTO PARA BFT';
@@ -512,8 +548,8 @@ const GestionSecadoScreen = ({ navigation }) => {
             </View>
 
             {activeTab === 'pendientes' && renderPendientes()}
-            {activeTab === 'proceso' && renderLotesList(lotesProceso, false)}
-            {activeTab === 'historial' && renderLotesList(lotesHistorial, true)}
+            {activeTab === 'proceso' && renderLotesList(lotesProceso, false, searchProceso, setSearchProceso)}
+            {activeTab === 'historial' && renderLotesList(lotesHistorial, true, searchHistorial, setSearchHistorial)}
         </View>
     );
 };
@@ -581,7 +617,17 @@ const styles = StyleSheet.create({
     dateRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5 },
     dateInput: { backgroundColor: 'rgba(255,255,255,0.1)', color: colors.white, padding: 10, borderRadius: 5, width: 60, textAlign: 'center', fontSize: 18 },
     dateSep: { color: colors.white, fontSize: 20 },
-    modalBtnRow: { flexDirection: 'row', marginTop: 20 }
+    modalBtnRow: { flexDirection: 'row', marginTop: 20 },
+
+    searchInput: {
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        color: colors.white,
+        padding: 10,
+        borderRadius: 8,
+        marginBottom: 15,
+        borderWidth: 1,
+        borderColor: '#555'
+    },
 });
 
 export default GestionSecadoScreen;
