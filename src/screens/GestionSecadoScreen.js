@@ -418,8 +418,8 @@ const GestionSecadoScreen = ({ navigation }) => {
         const sortedLotes = [...filteredLotes].sort((a, b) => {
             // Prioridad: STOCK SECO (FINALIZADO) primero en Proceso
             if (!isHistory) {
-                const isAStock = a.estado === 'FINALIZADO';
-                const isBStock = b.estado === 'FINALIZADO';
+                const isAStock = a.estado === 'FIN';
+                const isBStock = b.estado === 'FIN';
                 if (isAStock && !isBStock) return -1;
                 if (!isAStock && isBStock) return 1;
             }
@@ -439,14 +439,14 @@ const GestionSecadoScreen = ({ navigation }) => {
 
                 {sortedLotes.length === 0 && <Text style={styles.emptyText}>No hay lotes en esta categoría.</Text>}
                 {sortedLotes.map(lote => {
-                    const isReady = lote.estado === 'LISTO PARA BFT';
-                    const isStock = lote.estado === 'FINALIZADO'; // Stock Seco
-                    const isDespachado = lote.estado === 'DESPACHADO';
+                    const isReady = lote.estado === 'OK';
+                    const isStock = lote.estado === 'FIN'; // Stock Seco
+                    const isDespachado = lote.estado === 'DES';
 
                     // LÓGICA DE INTERACCIÓN:
-                    // - STOCK SECO (Proceso): Habilitado -> Navega a Despacho.
-                    // - DESPACHADO (Historial): Deshabilitado -> Solo Lectura.
-                    // - Otros (Secando, Listo): Deshabilitados (container), pero botones internos funcionan.
+                    // - STOCK SECO = 'SS' (Proceso): Habilitado -> Navega a Despacho.
+                    // - DESPACHADO = 'DES' (Historial): Deshabilitado -> Solo Lectura.
+                    // - Otros (Secando = 'SE', Listo = 'OK'): Deshabilitados (container), pero botones internos funcionan.
                     const isInteractive = isStock;
 
                     const handlePress = () => {
@@ -476,9 +476,9 @@ const GestionSecadoScreen = ({ navigation }) => {
                                             (isReady ? styles.badgeReady : styles.badgeProcess)
                                 ]}>
                                     <Text style={styles.badgeText}>
-                                        {isDespachado ? 'DESPACHADO' :
-                                            isStock ? 'STOCK SECO' :
-                                                (isReady ? 'LISTO PARA BFT' : (lote.estado || 'SECANDO'))}
+                                        {isDespachado ? 'DES' :
+                                            isStock ? 'SS' :
+                                                (isReady ? 'OK' : (lote.estado || 'SE'))}
                                     </Text>
                                 </View>
                             </View>
@@ -526,10 +526,10 @@ const GestionSecadoScreen = ({ navigation }) => {
     // --- FILTROS DE TABS ---
 
     // 1. Proceso: Todo lo que NO sea DESPACHADO
-    const lotesProceso = lotes.filter(l => l.estado !== 'DESPACHADO');
+    const lotesProceso = lotes.filter(l => l.estado !== 'DES');
 
     // 2. Historial: Solo lo que SÍ sea DESPACHADO
-    const lotesHistorial = lotes.filter(l => l.estado === 'DESPACHADO');
+    const lotesHistorial = lotes.filter(l => l.estado === 'DES');
 
     return (
         <View style={styles.container}>

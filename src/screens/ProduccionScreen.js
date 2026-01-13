@@ -119,7 +119,7 @@ const ProduccionScreen = () => {
                 bloquePesoSinCola: parseFloat(newBlock.pesoSin),
                 // Cálculo del volumen (BFT): largo * 8
                 bloqueBftFinal: (parseFloat(newBlock.largo)) * 8,
-                bloqueEstado: 'PRESENTADO',
+                bloqueEstado: 'PR',
                 bloqueObservacion: newBlock.observacion, // Campo de observación
                 tipoMadera: { idTipoMadera: newBlock.tipoMaderaId }
             };
@@ -222,7 +222,7 @@ const ProduccionScreen = () => {
     }
 
     // Filtrar bloques para Encolado
-    const bloquesEncolado = activeOrder && activeOrder.bloques ? activeOrder.bloques.filter(b => b.estado === 'PRESENTADO') : [];
+    const bloquesEncolado = activeOrder && activeOrder.bloques ? activeOrder.bloques.filter(b => b.estado === 'PR') : [];
     // Bloques recientes (todos o invertidos)
     const bloquesRecientes = activeOrder && activeOrder.bloques ? [...activeOrder.bloques].sort((a, b) => b.id - a.id) : [];
 
@@ -252,10 +252,10 @@ const ProduccionScreen = () => {
                     <Text style={[styles.tabText, activeTab === 'NUEVO' && styles.tabTextActive]}>Nuevo Bloque</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    style={[styles.tab, activeTab === 'ENCOLADO' && styles.tabActive]}
-                    onPress={() => setActiveTab('ENCOLADO')}
+                    style={[styles.tab, activeTab === 'EN' && styles.tabActive]}
+                    onPress={() => setActiveTab('EN')}
                 >
-                    <Text style={[styles.tabText, activeTab === 'ENCOLADO' && styles.tabTextActive]}>
+                    <Text style={[styles.tabText, activeTab === 'EN' && styles.tabTextActive]}>
                         Encolado ({bloquesEncolado.length})
                     </Text>
                 </TouchableOpacity>
@@ -316,8 +316,8 @@ const ProduccionScreen = () => {
                         <Text style={styles.label}>Tipo de Madera *</Text>
                         <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
                             {tiposMadera.map((tipo) => {
-                                const label = tipo.tipoDescripcion === 'L' ? 'Liviana' :
-                                    tipo.tipoDescripcion === 'P' ? 'Pesada' :
+                                const label = tipo.tipoDescripcion === 'L' ? 'LIVIANA' :
+                                    tipo.tipoDescripcion === 'P' ? 'PESADA' :
                                         tipo.tipoDescripcion;
                                 const isSelected = newBlock.tipoMaderaId === tipo.idTipoMadera;
 
@@ -355,7 +355,7 @@ const ProduccionScreen = () => {
                             <Text style={styles.itemText}>L:{item.bloqueLargo || item.largo || item.bLargo || 0}</Text>
                             <Text style={styles.itemText}>BFT:{item.bloqueBftFinal || item.bftFinal || item.bBftFinal || 0}</Text>
                             <Text style={styles.itemText}>{item.bloquePesoSinCola || item.pesoSin || item.bPesoSinCola || 0}kg</Text>
-                            <Text style={[styles.itemBadge, { backgroundColor: item.estado === 'ENCOLADO' ? colors.success : colors.warning }]}>
+                            <Text style={[styles.itemBadge, { backgroundColor: item.estado === 'EN' ? colors.success : colors.warning }]}>
                                 {/* Mostrar los dos primeros caracteres */}
                                 {item.estado ? item.estado.charAt(0) + item.estado.charAt(1) : ''}
                             </Text>
