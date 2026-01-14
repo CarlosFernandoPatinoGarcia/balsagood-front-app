@@ -78,6 +78,45 @@ const ProduccionScreen = () => {
             }
 
             if (response.data) {
+                // Auto-cierre de órdenes de días anteriores
+                try {
+                    let orderDate = new Date(response.data.ordenFechaInicio);
+
+                    // Soporte para fechas en array [anio, mes, dia, ...] (común en Spring Boot)
+                    if (Array.isArray(response.data.ordenFechaInicio)) {
+                        const [y, m, d] = response.data.ordenFechaInicio;
+                        // Mes en JS es 0-indexado
+                        orderDate = new Date(y, m - 1, d);
+                    }
+
+                    if (isNaN(orderDate.getDate())) {
+                        console.warn("Fecha orden inválida:", response.data.fechaInicio);
+                    } else {
+                        console.log("Fecha orden:", orderDate.toLocaleDateString());
+                        console.log("Fecha hoy:", new Date().toLocaleDateString());
+                        const today = new Date();
+                        // Comparación segura (ignora hora)
+                        const isSameDay = orderDate.toLocaleDateString() === today.toLocaleDateString();
+
+                        if (!isSameDay) {
+                            console.log(`Orden vencida (${orderDate.toLocaleDateString()}). Renovando...`);
+                            await api.patch('/api/ordenes-taller/finalizar');
+                            const resStart = await api.post('/api/ordenes-taller/iniciar');
+
+                            if (resStart.data) {
+                                setActiveOrder(resStart.data);
+                                Alert.alert("Nueva Jornada", `Iniciando orden del ${new Date().toLocaleDateString()}`);
+                            } else {
+                                const resNew = await api.get('/api/ordenes-taller/activa');
+                                setActiveOrder(resNew.data);
+                            }
+                            return;
+                        }
+                    }
+                } catch (err) {
+                    console.error("Error al validar fecha orden:", err);
+                }
+
                 // console.log("Orden Activa cargada:", response.data);
                 setActiveOrder(response.data);
             }
@@ -236,9 +275,16 @@ const ProduccionScreen = () => {
                         {new Date().toLocaleDateString()}
                     </Text>
 
+
+                </View>
+                <View>
+                    <Text style={styles.headerSubtitle}>
+                        {"Reporte Rápido"}
+                    </Text>
                     <TouchableOpacity onPress={handleExportarPDF} style={{ backgroundColor: '#e74c3c', padding: 8, borderRadius: 5 }}>
                         <Text style={{ color: 'white', fontWeight: 'bold' }}>PDF</Text>
                     </TouchableOpacity>
+
                 </View>
 
             </View>
@@ -267,6 +313,7 @@ const ProduccionScreen = () => {
                     <View style={styles.card}>
                         <Text style={styles.sectionTitle}>Registrar Bloque</Text>
 
+                        {/* Cada que se registra un bloque, que se aumente en uno el codigo */}
                         <Text style={styles.label}>Código Bloque</Text>
                         <TextInput
                             style={styles.input}
@@ -348,8 +395,8 @@ const ProduccionScreen = () => {
                     </View>
 
                     {/* LISTA RECIENTE */}
-                    <Text style={styles.listTitle}>Bloques Registrados</Text>
-                    {bloquesRecientes.map((item, index) => (
+                    <Text style={styles.listTitle}>Últimos Bloques Registrados</Text>
+                    {bloquesRecientes.slice(bloquesRecientes.length - 5, bloquesRecientes.length).map((item, index) => (
                         <View key={item.id || index} style={styles.itemRow}>
                             <Text style={styles.itemTextBold}>{item.bloqueCodigo || item.codigo || item.bCodigo || "S/C"}</Text>
                             <Text style={styles.itemText}>L:{item.bloqueLargo || item.largo || item.bLargo || 0}</Text>
@@ -361,6 +408,7 @@ const ProduccionScreen = () => {
                             </Text>
                         </View>
                     ))}
+
                 </ScrollView>
             ) : (
                 <View style={styles.content}>

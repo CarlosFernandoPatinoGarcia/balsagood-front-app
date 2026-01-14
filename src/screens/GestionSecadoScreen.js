@@ -315,15 +315,15 @@ const GestionSecadoScreen = ({ navigation }) => {
 
                 <TextInput
                     style={styles.searchInput}
-                    placeholder="Buscar por numero de viaje..."
+                    placeholder="Buscar por numero de viaje o nombre de proveedor..."
                     placeholderTextColor="#999"
                     value={searchPendientes}
                     onChangeText={setSearchPendientes}
                 />
 
                 {filteredPallets.map((p, index) => {
-                    //filtrar por numero de viaje
-                    const id = p.idPallet || p.recepcion.numViaje;
+                    //filtrar por numero de viaje o nombre de proveedor
+                    const id = p.idPallet || p.recepcion.numViaje || p.recepcion.proveedor.provNombre;
                     const uniqueKey = id ? id.toString() : `fallback-${index}`;
 
                     return (
