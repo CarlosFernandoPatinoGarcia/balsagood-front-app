@@ -167,7 +167,17 @@ const ProduccionScreen = () => {
             // console.log(payload);
             await api.post('/api/bloques', payload);
             Alert.alert('Éxito', 'Bloque registrado');
-            setNewBlock({ codigo: '', largo: '', pesoSin: '', observacion: '', tipoMadera: { idTipoMadera: null } });
+
+            // Auto-incrementar código
+            const nextCode = newBlock.codigo ? (parseInt(newBlock.codigo) + 1).toString() : '';
+
+            setNewBlock({
+                codigo: nextCode,
+                largo: '',
+                pesoSin: '',
+                observacion: '',
+                tipoMaderaId: null
+            });
             fetchActiveOrder(); // Recargar lista de bloques
         } catch (e) {
             console.error(e);

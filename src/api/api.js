@@ -1,10 +1,10 @@
 import axios from 'axios';
-
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Configuración por defecto
 const DEFAULT_IP = '192.168.1.63';
-const BASE_URL = `http://${DEFAULT_IP}:8080`;
+const DEFAULT_PORT = '8080';
+const BASE_URL = `http://${DEFAULT_IP}:${DEFAULT_PORT}`;
 
 const api = axios.create({
     baseURL: BASE_URL,
@@ -13,20 +13,25 @@ const api = axios.create({
     },
 });
 
-export const configureApi = async (ip) => {
+export const configureApi = async (url) => {
     try {
-        const cleanIp = ip.trim();
-        // Si el usuario no pone http, asumimos http y puerto 8080 si no lo especifica
-        let url = cleanIp;
-        if (!url.startsWith('http')) {
-            url = `http://${cleanIp}`;
-        }
-        if ((url.match(/:/g) || []).length < 2) { // Si no tiene dos puntos (http: y :port)
-            url = `${url}:8080`;
+        let cleanUrl = url.trim();
+
+        // Validar si ya tiene protocolo
+        if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+            // Si no tiene protocolo, asumir http
+            cleanUrl = `http://${cleanUrl}`;
+
+            // Si después de agregar http:// no tiene puerto (buscamos un segundo :), agregar 8080
+            // http://ip:port -> 2 colons. http://ip -> 1 colon.
+            if ((cleanUrl.match(/:/g) || []).length < 2) {
+                cleanUrl = `${cleanUrl}:${DEFAULT_PORT}`;
+            }
         }
 
-        api.defaults.baseURL = url;
-        await AsyncStorage.setItem('API_IP', cleanIp);
+        console.log("Configuring API URL:", cleanUrl); // Debug log
+        api.defaults.baseURL = cleanUrl;
+        await AsyncStorage.setItem('API_IP', cleanUrl);
 
     } catch (e) {
         console.error("Error saving IP", e);
@@ -35,15 +40,15 @@ export const configureApi = async (ip) => {
 
 export const loadApiConfiguration = async () => {
     try {
-        const savedIp = await AsyncStorage.getItem('API_IP');
-        if (savedIp) {
-            await configureApi(savedIp);
-            return savedIp;
+        const savedUrl = await AsyncStorage.getItem('API_IP'); // We reuse API_IP key for full URL
+        if (savedUrl) {
+            api.defaults.baseURL = savedUrl; // Ensure axios is updated
+            return savedUrl;
         }
     } catch (e) {
         console.error("Error loading IP", e);
     }
-    return DEFAULT_IP;
+    return BASE_URL;
 };
 
 export default api;
