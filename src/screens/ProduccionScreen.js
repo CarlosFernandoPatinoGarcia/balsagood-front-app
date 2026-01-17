@@ -122,6 +122,7 @@ const ProduccionScreen = () => {
             }
         } catch (error) {
             console.error("Error cargando orden:", error);
+            console.error("Error cargando orden:", error.response.data);
         } finally {
             setLoading(false);
         }
