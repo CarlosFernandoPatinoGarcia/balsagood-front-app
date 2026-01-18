@@ -21,6 +21,7 @@ const AgrupacionScreen = () => {
 
     // Recalcular totales al seleccionar
     useEffect(() => {
+        if (!Array.isArray(bloques)) return;
         const selectedBloques = bloques.filter(b => selectedIds.includes(b.idBloque));
 
         const sumLargo = selectedBloques.reduce((sum, b) => sum + (b.bloqueLargo || 0), 0);
@@ -34,7 +35,7 @@ const AgrupacionScreen = () => {
     const fetchBloques = async () => {
         try {
             const res = await api.get('/api/bloques/encolados');
-            setBloques(res.data);
+            setBloques(Array.isArray(res.data) ? res.data : []);
         } catch (e) {
             console.error(e);
             Alert.alert('Error', 'No se pudieron cargar los bloques encolados.');
@@ -111,9 +112,9 @@ const AgrupacionScreen = () => {
         );
     };
 
-    const filteredBloques = bloques.filter(b =>
-        b.bloqueCodigo.toString().includes(searchQuery)
-    );
+    const filteredBloques = Array.isArray(bloques) ? bloques.filter(b =>
+        (b.bloqueCodigo || '').toString().includes(searchQuery)
+    ) : [];
 
     return (
         <View style={styles.container}>

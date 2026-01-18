@@ -123,13 +123,13 @@ const GestionSecadoScreen = ({ navigation }) => {
     const fetchData = async () => {
         try {
             const resPallets = await api.get('/api/secado/disponibles');
-            setPalletsDisponibles(resPallets.data || []);
+            setPalletsDisponibles(Array.isArray(resPallets.data) ? resPallets.data : []);
 
             const resCamaras = await api.get('/api/camaras/estado/disponibles');
-            setCamaras(resCamaras.data || []);
+            setCamaras(Array.isArray(resCamaras.data) ? resCamaras.data : []);
 
             const resLotes = await api.get('/api/lotes-secado');
-            setLotes(resLotes.data || []);
+            setLotes(Array.isArray(resLotes.data) ? resLotes.data : []);
         } catch (error) {
             console.error("Error fetching data:", error);
         }
@@ -146,6 +146,7 @@ const GestionSecadoScreen = ({ navigation }) => {
     };
 
     const calculateSelectedBFT = () => {
+        if (!Array.isArray(palletsDisponibles)) return 0;
         const selected = palletsDisponibles.filter(p => selectedPallets.includes(p.idPallet));
         return selected.reduce((sum, p) => sum + (parseFloat(p.bftVerdeAceptado) || 0), 0);
     };
@@ -246,7 +247,8 @@ const GestionSecadoScreen = ({ navigation }) => {
     // --- Renderers ---
 
     const renderPendientes = () => {
-        const filteredPallets = palletsDisponibles.filter(p =>
+        const safePallets = Array.isArray(palletsDisponibles) ? palletsDisponibles : [];
+        const filteredPallets = safePallets.filter(p =>
             (p.recepcion?.numViaje || '').toString().toLowerCase().includes(searchPendientes.toLowerCase())
         );
 
@@ -410,7 +412,8 @@ const GestionSecadoScreen = ({ navigation }) => {
     };
 
     const renderLotesList = (dataLotes, isHistory, searchQuery, setSearchQuery) => {
-        const filteredLotes = dataLotes.filter(l =>
+        const safeLotes = Array.isArray(dataLotes) ? dataLotes : [];
+        const filteredLotes = safeLotes.filter(l =>
             (l.loteCodigo || '').toString().includes(searchQuery) ||
             l.idLote.toString().includes(searchQuery)
         );

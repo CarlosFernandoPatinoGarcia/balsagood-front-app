@@ -57,7 +57,13 @@ const ProduccionScreen = () => {
         try {
             // Cargar tipos madera en paralelo
             const resMadera = await api.get('/api/tipos-madera');
-            setTiposMadera(resMadera.data || []);
+            const data = resMadera.data;
+            if (Array.isArray(data)) {
+                setTiposMadera(data);
+            } else {
+                console.warn("Respuesta tipos-madera no es array:", data);
+                setTiposMadera([]);
+            }
 
             let response = await api.get('/api/ordenes-taller/activa');
 
@@ -373,7 +379,7 @@ const ProduccionScreen = () => {
 
                         <Text style={styles.label}>Tipo de Madera *</Text>
                         <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
-                            {tiposMadera.map((tipo) => {
+                            {Array.isArray(tiposMadera) && tiposMadera.map((tipo) => {
                                 const label = tipo.tipoDescripcion === 'L' ? 'LIVIANA' :
                                     tipo.tipoDescripcion === 'P' ? 'PESADA' :
                                         tipo.tipoDescripcion;

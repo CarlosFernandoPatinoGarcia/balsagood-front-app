@@ -144,7 +144,13 @@ const IngresoPalletsScreen = () => {
     const fetchTiposMadera = async () => {
         try {
             const response = await api.get('/api/tipos-madera');
-            setTiposMadera(response.data || []);
+            const data = response.data;
+            if (Array.isArray(data)) {
+                setTiposMadera(data);
+            } else {
+                console.warn("Respuesta tipos-madera no es array:", data);
+                setTiposMadera([]);
+            }
         } catch (error) {
             console.error("Error fetching tipos madera:", error);
         }
@@ -526,7 +532,7 @@ const IngresoPalletsScreen = () => {
 
                     <Text style={styles.label}>Tipo de Madera *</Text>
                     <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>
-                        {tiposMadera.map((tipo) => {
+                        {Array.isArray(tiposMadera) && tiposMadera.map((tipo) => {
                             const label = tipo.tipoDescripcion === 'L' ? 'Liviana' :
                                 tipo.tipoDescripcion === 'P' ? 'Pesada' :
                                     tipo.tipoDescripcion;
