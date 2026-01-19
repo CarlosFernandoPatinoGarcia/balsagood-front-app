@@ -1,7 +1,7 @@
 import React, { createContext, useReducer, useEffect, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import api, { loadApiConfiguration } from '../api/api';
+import api from '../api/api';
 
 export const AuthContext = createContext();
 
@@ -54,25 +54,30 @@ export const AuthProvider = ({ children }) => {
 
     const authContext = useMemo(
         () => ({
-            signIn: async (data) => {
+            signIn: async ({ username, password }) => {
                 try {
-                    // Get current base URL to ensure we hit the right server
-                    const baseURL = await loadApiConfiguration(); // Or api.defaults.baseURL
-
-                    const response = await axios.post(`${baseURL}/auth/login`, {
-                        username: data.username,
-                        password: data.password
+                    const response = await api.post('/api/auth/login', {
+                        usuarioNombre: username,
+                        usuarioClave: password
                     });
 
-                    // Assuming response.data.token contains the JWT
-                    // Adjust based on actual backend response structure
-                    const { token } = response.data;
+                    let token = null;
+
+                    if (typeof response.data === 'string') {
+                        token = response.data;
+                    } else if (response.data.token) {
+                        token = response.data.token;
+                    } else if (response.data.accessToken) {
+                        token = response.data.accessToken;
+                    } else if (response.data.jwt) {
+                        token = response.data.jwt;
+                    }
 
                     if (token) {
                         await AsyncStorage.setItem('userToken', token);
                         dispatch({ type: 'SIGN_IN', token: token });
                     } else {
-                        throw new Error("No token received");
+                        throw new Error("No token received. Response: " + JSON.stringify(response.data));
                     }
                 } catch (error) {
                     console.error("Login failed", error);

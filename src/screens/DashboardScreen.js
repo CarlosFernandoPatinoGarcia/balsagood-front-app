@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { colors } from '../theme/colors';
 import FormIP from './FormIP';
+import { AuthContext } from '../context/AuthContext';
 
 const MenuButton = ({ title, onPress }) => (
     <TouchableOpacity style={styles.card} onPress={onPress}>
@@ -11,15 +12,21 @@ const MenuButton = ({ title, onPress }) => (
 
 const DashboardScreen = ({ navigation }) => {
     const [modalVisible, setModalVisible] = useState(false);
+    const { authContext } = useContext(AuthContext);
 
     return (
         <View style={{ flex: 1 }}>
             <ScrollView contentContainerStyle={styles.container}>
                 <View style={styles.headerContainer}>
                     <Text style={styles.header}>Panel Supervisor</Text>
-                    <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.settingsBtn}>
-                        <Text style={styles.settingsBtnText}>⚙️</Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row' }}>
+                        <TouchableOpacity onPress={() => authContext.signOut()} style={[styles.settingsBtn, { marginRight: 10 }]}>
+                            <Text style={styles.settingsBtnText}>🚪</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.settingsBtn}>
+                            <Text style={styles.settingsBtnText}>⚙️</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 <MenuButton

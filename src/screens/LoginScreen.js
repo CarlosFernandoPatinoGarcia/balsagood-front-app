@@ -14,6 +14,7 @@ import {
 import { AuthContext } from '../context/AuthContext';
 import { colors } from '../theme/colors';
 import FormIP from './FormIP'; // Ensure this path is correct if we want to allow IP config on login
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LoginScreen = () => {
     const [username, setUsername] = useState('');
@@ -24,6 +25,7 @@ const LoginScreen = () => {
     const { authContext } = useContext(AuthContext);
 
     const handleLogin = async () => {
+
         if (!username || !password) {
             Alert.alert('Error', 'Por favor ingrese usuario y contraseña');
             return;
@@ -49,7 +51,7 @@ const LoginScreen = () => {
             <View style={styles.logoContainer}>
                 {/* Placeholder for logo if available, or just text */}
                 <Text style={styles.title}>Balsagood S.A.</Text>
-                <Text style={styles.subtitle}>Gestión de Producción</Text>
+                <Text style={styles.subtitle}>Bienvenido, Supervisor</Text>
             </View>
 
             <View style={styles.formContainer}>
@@ -65,12 +67,16 @@ const LoginScreen = () => {
 
                 <Text style={styles.label}>Contraseña</Text>
                 <TextInput
+                    textContentType="password"
                     style={styles.input}
                     placeholder="Ingrese su contraseña"
                     placeholderTextColor="#aaa"
                     value={password}
                     onChangeText={setPassword}
                     secureTextEntry={true}
+                    autoCorrect={false}
+                    autoCapitalize="none"
+                    spellCheck={false}
                 />
 
                 <TouchableOpacity

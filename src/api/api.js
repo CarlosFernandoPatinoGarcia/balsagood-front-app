@@ -24,7 +24,7 @@ api.interceptors.request.use(
         const token = await AsyncStorage.getItem('userToken');
 
         // 3. Si existe, pegarlo en la cabecera Authorization
-        if (token) {
+        if (token && !config.url.includes('/auth')) {
             config.headers.Authorization = `Bearer ${token}`;
         }
 
