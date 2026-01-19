@@ -13,6 +13,39 @@ const api = axios.create({
     },
 });
 
+// --- AGREGAR ESTO: EL INTERCEPTOR ---
+api.interceptors.request.use(
+    async (config) => {
+        // 1. Obtener la IP dinámica guardada (para que no falle si cambiaste de red)
+        // La URL base ya es manejada por api.defaults.baseURL y loadApiConfiguration
+        // No sobreescribir aquí con una lógica diferente.
+
+        // 2. Obtener el TOKEN de seguridad
+        const token = await AsyncStorage.getItem('userToken');
+
+        // 3. Si existe, pegarlo en la cabecera Authorization
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
+
+// (Opcional) Interceptor de respuesta para manejar cuando el token expira
+api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        if (error.response && error.response.status === 403) {
+            // El token venció o es inválido. Podrías borrarlo y mandar al Login.
+            await AsyncStorage.removeItem('userToken');
+            console.error("Acceso denegado (403). El token puede haber expirado.");
+        }
+        return Promise.reject(error);
+    }
+);
+
 export const configureApi = async (url) => {
     try {
         let cleanUrl = url.trim();
